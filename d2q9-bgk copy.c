@@ -62,8 +62,8 @@
 
 #define C_SQ (1.f / 3.f) /* square of speed of sound */
 #define W0 (4.f / 9.f)   /* weighting factor */
-#define W1 (1.f / 9.f)   /* weighting factor */
-#define W2 (1.f / 36.f)  /* weighting factor */
+#define W1 (1.f / 9.f)       /* weighting factor */
+#define W2 (1.f / 36.f)         /* weighting factor */
 
 /* struct to hold the parameter values */
 typedef struct
