@@ -304,9 +304,9 @@ int collision(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obs
       /* don't consider occupied cells */
       if (!obstacles[ii + jj * params.nx])
       {
-        int index = ii + jj *params.nx;
-                         /* compute local density total */
-                         float local_density = 0.f;
+        int index = ii + jj * params.nx;
+        /* compute local density total */
+        float local_density = 0.f;
 
         for (int kk = 0; kk < NSPEEDS; kk++)
         {
@@ -348,16 +348,15 @@ int collision(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obs
         d_equ[8] = W2 * local_density * (1.f + 3 * u[8] + 4.5f * (u[8] * u[8]) - 1.5f * u_sq);
 
         /* relaxation step */
-          cells[index].speeds[0] = tmp_cells[index].speeds[0] + params.omega * (d_equ[0] - tmp_cells[index].speeds[0]);
-          cells[index].speeds[1] = tmp_cells[index].speeds[1] + params.omega * (d_equ[1] - tmp_cells[index].speeds[1]);
-          cells[index].speeds[2] = tmp_cells[index].speeds[2] + params.omega * (d_equ[2] - tmp_cells[index].speeds[2]);
-          cells[index].speeds[3] = tmp_cells[index].speeds[3] + params.omega * (d_equ[3] - tmp_cells[index].speeds[3]);
-          cells[index].speeds[4] = tmp_cells[index].speeds[4] + params.omega * (d_equ[4] - tmp_cells[index].speeds[4]);
-          cells[index].speeds[5] = tmp_cells[index].speeds[5] + params.omega * (d_equ[5] - tmp_cells[index].speeds[5]);
-          cells[index].speeds[6] = tmp_cells[index].speeds[6] + params.omega * (d_equ[6] - tmp_cells[index].speeds[6]);
-          cells[index].speeds[7] = tmp_cells[index].speeds[7] + params.omega * (d_equ[7] - tmp_cells[index].speeds[7]);
-          cells[index].speeds[8] = tmp_cells[index].speeds[8] + params.omega * (d_equ[8] - tmp_cells[index].speeds[8]);
-        
+        cells[index].speeds[0] = tmp_cells[index].speeds[0] + params.omega * (d_equ[0] - tmp_cells[index].speeds[0]);
+        cells[index].speeds[1] = tmp_cells[index].speeds[1] + params.omega * (d_equ[1] - tmp_cells[index].speeds[1]);
+        cells[index].speeds[2] = tmp_cells[index].speeds[2] + params.omega * (d_equ[2] - tmp_cells[index].speeds[2]);
+        cells[index].speeds[3] = tmp_cells[index].speeds[3] + params.omega * (d_equ[3] - tmp_cells[index].speeds[3]);
+        cells[index].speeds[4] = tmp_cells[index].speeds[4] + params.omega * (d_equ[4] - tmp_cells[index].speeds[4]);
+        cells[index].speeds[5] = tmp_cells[index].speeds[5] + params.omega * (d_equ[5] - tmp_cells[index].speeds[5]);
+        cells[index].speeds[6] = tmp_cells[index].speeds[6] + params.omega * (d_equ[6] - tmp_cells[index].speeds[6]);
+        cells[index].speeds[7] = tmp_cells[index].speeds[7] + params.omega * (d_equ[7] - tmp_cells[index].speeds[7]);
+        cells[index].speeds[8] = tmp_cells[index].speeds[8] + params.omega * (d_equ[8] - tmp_cells[index].speeds[8]);
       }
     }
   }
