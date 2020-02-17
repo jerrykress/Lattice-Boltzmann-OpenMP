@@ -141,6 +141,7 @@ int main(int argc, char *argv[])
   t_param params;            /* struct to hold parameter values */
   t_speed *cells = NULL;     /* grid containing fluid densities */
   t_speed *tmp_cells = NULL; /* scratch space */
+  t_speed *swp_cells = NULL;
   int *obstacles = NULL;     /* grid indicating which cells are blocked */
   float *av_vels = NULL;     /* a record of the av. velocity computed for each timestep */
   struct timeval timstr;     /* structure to hold elapsed time */
@@ -170,6 +171,9 @@ int main(int argc, char *argv[])
   for (int tt = 0; tt < params.maxIters; tt++)
   {
     timestep(params, cells, tmp_cells, obstacles);
+    swp_cells = cells;
+    cells = tmp_cells;
+    tmp_cells = swp_cells;
     av_vels[tt] = av_velocity(params, cells, obstacles);
 #ifdef DEBUG
     printf("==timestep: %d==\n", tt);
@@ -271,6 +275,7 @@ int propagate(const t_param params, t_speed *cells, t_speed *tmp_cells)
 
 int rebound(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obstacles)
 {
+  float tmp_speed[NSPEEDS];
   /* loop over the cells in the grid */
   for (int jj = 0; jj < params.ny; jj++)
   {
@@ -281,14 +286,23 @@ int rebound(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obsta
       {
         /* called after propagate, so taking values from scratch space
         ** mirroring, and writing into main grid */
-        cells->speed_1[ii + jj * params.nx] = tmp_cells->speed_3[ii + jj * params.nx];
-        cells->speed_2[ii + jj * params.nx] = tmp_cells->speed_4[ii + jj * params.nx];
-        cells->speed_3[ii + jj * params.nx] = tmp_cells->speed_1[ii + jj * params.nx];
-        cells->speed_4[ii + jj * params.nx] = tmp_cells->speed_2[ii + jj * params.nx];
-        cells->speed_5[ii + jj * params.nx] = tmp_cells->speed_7[ii + jj * params.nx];
-        cells->speed_6[ii + jj * params.nx] = tmp_cells->speed_8[ii + jj * params.nx];
-        cells->speed_7[ii + jj * params.nx] = tmp_cells->speed_5[ii + jj * params.nx];
-        cells->speed_8[ii + jj * params.nx] = tmp_cells->speed_6[ii + jj * params.nx];
+        tmp_speed[1] = tmp_cells->speed_3[ii + jj * params.nx];
+        tmp_speed[2] = tmp_cells->speed_4[ii + jj * params.nx];
+        tmp_speed[3] = tmp_cells->speed_1[ii + jj * params.nx];
+        tmp_speed[4] = tmp_cells->speed_2[ii + jj * params.nx];
+        tmp_speed[5] = tmp_cells->speed_7[ii + jj * params.nx];
+        tmp_speed[6] = tmp_cells->speed_8[ii + jj * params.nx];
+        tmp_speed[7] = tmp_cells->speed_5[ii + jj * params.nx];
+        tmp_speed[8] = tmp_cells->speed_6[ii + jj * params.nx];
+
+        tmp_cells->speed_1[ii + jj * params.nx] = tmp_speed[1];
+        tmp_cells->speed_2[ii + jj * params.nx] = tmp_speed[2];
+        tmp_cells->speed_3[ii + jj * params.nx] = tmp_speed[3];
+        tmp_cells->speed_4[ii + jj * params.nx] = tmp_speed[4];
+        tmp_cells->speed_5[ii + jj * params.nx] = tmp_speed[5];
+        tmp_cells->speed_6[ii + jj * params.nx] = tmp_speed[6];
+        tmp_cells->speed_7[ii + jj * params.nx] = tmp_speed[7];
+        tmp_cells->speed_8[ii + jj * params.nx] = tmp_speed[8];
       }
     }
   }
@@ -363,15 +377,15 @@ int collision(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obs
         d_equ[8] = W2 * local_density * (1.f + 3 * u[8] + 4.5f * (u[8] * u[8]) - 1.5f * u_sq);
 
         /* relaxation step */
-        cells->speed_0[index] = tmp_cells->speed_0[index] + params.omega * (d_equ[0] - tmp_cells->speed_0[index]);
-        cells->speed_1[index] = tmp_cells->speed_1[index] + params.omega * (d_equ[1] - tmp_cells->speed_1[index]);
-        cells->speed_2[index] = tmp_cells->speed_2[index] + params.omega * (d_equ[2] - tmp_cells->speed_2[index]);
-        cells->speed_3[index] = tmp_cells->speed_3[index] + params.omega * (d_equ[3] - tmp_cells->speed_3[index]);
-        cells->speed_4[index] = tmp_cells->speed_4[index] + params.omega * (d_equ[4] - tmp_cells->speed_4[index]);
-        cells->speed_5[index] = tmp_cells->speed_5[index] + params.omega * (d_equ[5] - tmp_cells->speed_5[index]);
-        cells->speed_6[index] = tmp_cells->speed_6[index] + params.omega * (d_equ[6] - tmp_cells->speed_6[index]);
-        cells->speed_7[index] = tmp_cells->speed_7[index] + params.omega * (d_equ[7] - tmp_cells->speed_7[index]);
-        cells->speed_8[index] = tmp_cells->speed_8[index] + params.omega * (d_equ[8] - tmp_cells->speed_8[index]);
+        tmp_cells->speed_0[index] = tmp_cells->speed_0[index] + params.omega * (d_equ[0] - tmp_cells->speed_0[index]);
+        tmp_cells->speed_1[index] = tmp_cells->speed_1[index] + params.omega * (d_equ[1] - tmp_cells->speed_1[index]);
+        tmp_cells->speed_2[index] = tmp_cells->speed_2[index] + params.omega * (d_equ[2] - tmp_cells->speed_2[index]);
+        tmp_cells->speed_3[index] = tmp_cells->speed_3[index] + params.omega * (d_equ[3] - tmp_cells->speed_3[index]);
+        tmp_cells->speed_4[index] = tmp_cells->speed_4[index] + params.omega * (d_equ[4] - tmp_cells->speed_4[index]);
+        tmp_cells->speed_5[index] = tmp_cells->speed_5[index] + params.omega * (d_equ[5] - tmp_cells->speed_5[index]);
+        tmp_cells->speed_6[index] = tmp_cells->speed_6[index] + params.omega * (d_equ[6] - tmp_cells->speed_6[index]);
+        tmp_cells->speed_7[index] = tmp_cells->speed_7[index] + params.omega * (d_equ[7] - tmp_cells->speed_7[index]);
+        tmp_cells->speed_8[index] = tmp_cells->speed_8[index] + params.omega * (d_equ[8] - tmp_cells->speed_8[index]);
       }
     }
   }
