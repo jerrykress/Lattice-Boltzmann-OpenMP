@@ -213,6 +213,16 @@ int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obst
 
 int accelerate_flow(const t_param params, t_speed *cells, int *obstacles)
 {
+  __assume_aligned(cells->speed_0, 64);
+  __assume_aligned(cells->speed_1, 64);
+  __assume_aligned(cells->speed_2, 64);
+  __assume_aligned(cells->speed_3, 64);
+  __assume_aligned(cells->speed_4, 64);
+  __assume_aligned(cells->speed_5, 64);
+  __assume_aligned(cells->speed_6, 64);
+  __assume_aligned(cells->speed_7, 64);
+  __assume_aligned(cells->speed_8, 64);
+
   /* compute weighting factors */
   float w1 = params.density * params.accel / 9.f;
   float w2 = params.density * params.accel / 36.f;
@@ -244,9 +254,28 @@ int accelerate_flow(const t_param params, t_speed *cells, int *obstacles)
 int propagate(const t_param params, t_speed *cells, t_speed *tmp_cells)
 {
 /* loop over _all_ cells */
+__assume_aligned(cells->speed_0, 64);
+__assume_aligned(cells->speed_1, 64);
+__assume_aligned(cells->speed_2, 64);
+__assume_aligned(cells->speed_3, 64);
+__assume_aligned(cells->speed_4, 64);
+__assume_aligned(cells->speed_5, 64);
+__assume_aligned(cells->speed_6, 64);
+__assume_aligned(cells->speed_7, 64);
+__assume_aligned(cells->speed_8, 64);
 
-  for (int jj = 0; jj < params.ny; jj++)
-  {
+__assume_aligned(tmp_cells->speed_0, 64);
+__assume_aligned(tmp_cells->speed_1, 64);
+__assume_aligned(tmp_cells->speed_2, 64);
+__assume_aligned(tmp_cells->speed_3, 64);
+__assume_aligned(tmp_cells->speed_4, 64);
+__assume_aligned(tmp_cells->speed_5, 64);
+__assume_aligned(tmp_cells->speed_6, 64);
+__assume_aligned(tmp_cells->speed_7, 64);
+__assume_aligned(tmp_cells->speed_8, 64);
+
+for (int jj = 0; jj < params.ny; jj++)
+{
 #pragma ivdep
     for (int ii = 0; ii < params.nx; ii++)
     {
@@ -276,6 +305,26 @@ int propagate(const t_param params, t_speed *cells, t_speed *tmp_cells)
 
 int rebound(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obstacles)
 {
+  __assume_aligned(cells->speed_0, 64);
+  __assume_aligned(cells->speed_1, 64);
+  __assume_aligned(cells->speed_2, 64);
+  __assume_aligned(cells->speed_3, 64);
+  __assume_aligned(cells->speed_4, 64);
+  __assume_aligned(cells->speed_5, 64);
+  __assume_aligned(cells->speed_6, 64);
+  __assume_aligned(cells->speed_7, 64);
+  __assume_aligned(cells->speed_8, 64);
+
+  __assume_aligned(tmp_cells->speed_0, 64);
+  __assume_aligned(tmp_cells->speed_1, 64);
+  __assume_aligned(tmp_cells->speed_2, 64);
+  __assume_aligned(tmp_cells->speed_3, 64);
+  __assume_aligned(tmp_cells->speed_4, 64);
+  __assume_aligned(tmp_cells->speed_5, 64);
+  __assume_aligned(tmp_cells->speed_6, 64);
+  __assume_aligned(tmp_cells->speed_7, 64);
+  __assume_aligned(tmp_cells->speed_8, 64);
+
   float tmp_speed[NSPEEDS];
   /* loop over the cells in the grid */
   for (int jj = 0; jj < params.ny; jj++)
@@ -314,6 +363,25 @@ int rebound(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obsta
 
 int collision(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obstacles)
 {
+  __assume_aligned(cells->speed_0, 64);
+  __assume_aligned(cells->speed_1, 64);
+  __assume_aligned(cells->speed_2, 64);
+  __assume_aligned(cells->speed_3, 64);
+  __assume_aligned(cells->speed_4, 64);
+  __assume_aligned(cells->speed_5, 64);
+  __assume_aligned(cells->speed_6, 64);
+  __assume_aligned(cells->speed_7, 64);
+  __assume_aligned(cells->speed_8, 64);
+
+  __assume_aligned(tmp_cells->speed_0, 64);
+  __assume_aligned(tmp_cells->speed_1, 64);
+  __assume_aligned(tmp_cells->speed_2, 64);
+  __assume_aligned(tmp_cells->speed_3, 64);
+  __assume_aligned(tmp_cells->speed_4, 64);
+  __assume_aligned(tmp_cells->speed_5, 64);
+  __assume_aligned(tmp_cells->speed_6, 64);
+  __assume_aligned(tmp_cells->speed_7, 64);
+  __assume_aligned(tmp_cells->speed_8, 64);
   // const float c_sq = 1.f / 3.f; /* square of speed of sound */
   // const float w0 = 4.f / 9.f;   /* weighting factor */
   // const float w1 = 1.f / 9.f;   /* weighting factor */
@@ -398,6 +466,17 @@ int collision(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obs
 
 float av_velocity(const t_param params, t_speed *cells, int *obstacles)
 {
+  __assume_aligned(cells->speed_0, 64);
+  __assume_aligned(cells->speed_1, 64);
+  __assume_aligned(cells->speed_2, 64);
+  __assume_aligned(cells->speed_3, 64);
+  __assume_aligned(cells->speed_4, 64);
+  __assume_aligned(cells->speed_5, 64);
+  __assume_aligned(cells->speed_6, 64);
+  __assume_aligned(cells->speed_7, 64);
+  __assume_aligned(cells->speed_8, 64);
+
+
   int tot_cells = 0; /* no. of cells used in calculation */
   float tot_u;       /* accumulated magnitudes of velocity for each cell */
 
