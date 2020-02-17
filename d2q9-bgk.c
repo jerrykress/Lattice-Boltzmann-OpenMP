@@ -64,6 +64,9 @@
 #define W0 (4.f / 9.f)   /* weighting factor */
 #define W1 (1.f / 9.f)   /* weighting factor */
 #define W2 (1.f / 36.f)  /* weighting factor */
+#define C1_5 1.5f
+#define C1_ 1.f
+#define C4_5 4.5f
 
 /* struct to hold the parameter values */
 typedef struct
@@ -106,10 +109,10 @@ int initialise(const char *paramfile, const char *obstaclefile,
 ** accelerate_flow(), propagate(), rebound() & collision()
 */
 int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obstacles);
-int accelerate_flow(const t_param params, t_speed *cells, int *obstacles);
+int accelerate_flow(const t_param params, t_speed *cells, const int *obstacles);
 int propagate(const t_param params, t_speed *cells, t_speed *tmp_cells);
-int rebound(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obstacles);
-int collision(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obstacles);
+int rebound(const t_param params, t_speed *cells, t_speed *tmp_cells, const int *obstacles);
+int collision(const t_param params, t_speed *cells, t_speed *tmp_cells, const int *obstacles);
 int write_values(const t_param params, t_speed *cells, int *obstacles, float *av_vels);
 
 /* finalise, including freeing up allocated memory */
@@ -202,7 +205,7 @@ int main(int argc, char *argv[])
   return EXIT_SUCCESS;
 }
 
-int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obstacles)
+int timestep(const t_param params, t_speed *restrict cells, t_speed * restrict tmp_cells, int *obstacles)
 {
   accelerate_flow(params, cells, obstacles);
   propagate(params, cells, tmp_cells);
@@ -211,7 +214,7 @@ int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obst
   return EXIT_SUCCESS;
 }
 
-int accelerate_flow(const t_param params, t_speed *cells, int *obstacles)
+int accelerate_flow(const t_param params, t_speed *restrict cells, const int *obstacles)
 {
   __assume_aligned(cells->speed_0, 64);
   __assume_aligned(cells->speed_1, 64);
@@ -233,25 +236,26 @@ int accelerate_flow(const t_param params, t_speed *cells, int *obstacles)
 #pragma ivdep
   for (int ii = 0; ii < params.nx; ii++)
   {
+    int index = ii + jj * params.nx;
     /* if the cell is not occupied and
     ** we don't send a negative density */
-    if (!obstacles[ii + jj * params.nx] && (cells->speed_3[ii + jj * params.nx] - w1) > 0.f && (cells->speed_6[ii + jj * params.nx] - w2) > 0.f && (cells->speed_7[ii + jj * params.nx] - w2) > 0.f)
+    if (!obstacles[index] && (cells->speed_3[index] - w1) > 0.f && (cells->speed_6[index] - w2) > 0.f && (cells->speed_7[index] - w2) > 0.f)
     {
       /* increase 'east-side' densities */
-      cells->speed_1[ii + jj * params.nx] += w1;
-      cells->speed_5[ii + jj * params.nx] += w2;
-      cells->speed_8[ii + jj * params.nx] += w2;
+      cells->speed_1[index] += w1;
+      cells->speed_5[index] += w2;
+      cells->speed_8[index] += w2;
       /* decrease 'west-side' densities */
-      cells->speed_3[ii + jj * params.nx] -= w1;
-      cells->speed_6[ii + jj * params.nx] -= w2;
-      cells->speed_7[ii + jj * params.nx] -= w2;
+      cells->speed_3[index] -= w1;
+      cells->speed_6[index] -= w2;
+      cells->speed_7[index] -= w2;
     }
   }
 
   return EXIT_SUCCESS;
 }
 
-int propagate(const t_param params, t_speed *cells, t_speed *tmp_cells)
+int propagate(const t_param params, t_speed * restrict cells, t_speed * restrict tmp_cells)
 {
 /* loop over _all_ cells */
 __assume_aligned(cells->speed_0, 64);
@@ -303,7 +307,7 @@ for (int jj = 0; jj < params.ny; jj++)
   return EXIT_SUCCESS;
 }
 
-int rebound(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obstacles)
+int rebound(const t_param params, t_speed *restrict cells, t_speed *restrict tmp_cells, const int *obstacles)
 {
   __assume_aligned(cells->speed_0, 64);
   __assume_aligned(cells->speed_1, 64);
@@ -361,7 +365,7 @@ int rebound(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obsta
   return EXIT_SUCCESS;
 }
 
-int collision(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obstacles)
+int collision(const t_param params, t_speed * restrict cells, t_speed * restrict tmp_cells, const int *obstacles)
 {
   __assume_aligned(cells->speed_0, 64);
   __assume_aligned(cells->speed_1, 64);
@@ -391,6 +395,7 @@ int collision(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obs
   ** NB the collision step is called after
   ** the propagate step and so values of interest
   ** are in the scratch-space grid */
+
   for (int jj = 0; jj < params.ny; jj++)
   {
 #pragma ivdep
@@ -435,17 +440,17 @@ int collision(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obs
         /* equilibrium densities */
         float d_equ[NSPEEDS];
         /* zero velocity density: weight w0 */
-        d_equ[0] = W0 * local_density * (1.f - 1.5f * u_sq);
+        d_equ[0] = W0 * local_density * (C1_ - C1_5 * u_sq);
         /* axis speeds: weight w1 */
-        d_equ[1] = W1 * local_density * (1.f + 3 * u[1] + 4.5f * (u[1] * u[1]) - 1.5f * u_sq);
-        d_equ[2] = W1 * local_density * (1.f + 3 * u[2] + 4.5f * (u[2] * u[2]) - 1.5f * u_sq);
-        d_equ[3] = W1 * local_density * (1.f + 3 * u[3] + 4.5f * (u[3] * u[3]) - 1.5f * u_sq);
-        d_equ[4] = W1 * local_density * (1.f + 3 * u[4] + 4.5f * (u[4] * u[4]) - 1.5f * u_sq);
+        d_equ[1] = W1 * local_density * (C1_ + 3 * u[1] + C4_5 * (u[1] * u[1]) - C1_5 * u_sq);
+        d_equ[2] = W1 * local_density * (C1_ + 3 * u[2] + C4_5 * (u[2] * u[2]) - C1_5 * u_sq);
+        d_equ[3] = W1 * local_density * (C1_ + 3 * u[3] + C4_5 * (u[3] * u[3]) - C1_5 * u_sq);
+        d_equ[4] = W1 * local_density * (C1_ + 3 * u[4] + C4_5 * (u[4] * u[4]) - C1_5 * u_sq);
         /* diagonal speeds: weight w2 */
-        d_equ[5] = W2 * local_density * (1.f + 3 * u[5] + 4.5f * (u[5] * u[5]) - 1.5f * u_sq);
-        d_equ[6] = W2 * local_density * (1.f + 3 * u[6] + 4.5f * (u[6] * u[6]) - 1.5f * u_sq);
-        d_equ[7] = W2 * local_density * (1.f + 3 * u[7] + 4.5f * (u[7] * u[7]) - 1.5f * u_sq);
-        d_equ[8] = W2 * local_density * (1.f + 3 * u[8] + 4.5f * (u[8] * u[8]) - 1.5f * u_sq);
+        d_equ[5] = W2 * local_density * (C1_ + 3 * u[5] + C4_5 * (u[5] * u[5]) - C1_5 * u_sq);
+        d_equ[6] = W2 * local_density * (C1_ + 3 * u[6] + C4_5 * (u[6] * u[6]) - C1_5 * u_sq);
+        d_equ[7] = W2 * local_density * (C1_ + 3 * u[7] + C4_5 * (u[7] * u[7]) - C1_5 * u_sq);
+        d_equ[8] = W2 * local_density * (C1_ + 3 * u[8] + C4_5 * (u[8] * u[8]) - C1_5 * u_sq);
 
         /* relaxation step */
         tmp_cells->speed_0[index] = tmp_cells->speed_0[index] + params.omega * (d_equ[0] - tmp_cells->speed_0[index]);
@@ -464,7 +469,7 @@ int collision(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obs
   return EXIT_SUCCESS;
 }
 
-float av_velocity(const t_param params, t_speed *cells, int *obstacles)
+float av_velocity(const t_param params, t_speed * restrict cells, int *obstacles)
 {
   __assume_aligned(cells->speed_0, 64);
   __assume_aligned(cells->speed_1, 64);
@@ -733,7 +738,7 @@ int finalise(const t_param *params, t_speed **cells_ptr, t_speed **tmp_cells_ptr
 
 float calc_reynolds(const t_param params, t_speed *cells, int *obstacles)
 {
-  const float viscosity = 1.f / 6.f * (2.f / params.omega - 1.f);
+  const float viscosity = C1_ / 6.f * (2.f / params.omega - C1_);
 
   return av_velocity(params, cells, obstacles) * params.reynolds_dim / viscosity;
 }
@@ -764,7 +769,7 @@ float total_density(const t_param params, t_speed *cells)
 int write_values(const t_param params, t_speed *cells, int *obstacles, float *av_vels)
 {
   FILE *fp;                     /* file pointer */
-  const float c_sq = 1.f / 3.f; /* sq. of speed of sound */
+  const float c_sq = C1_ / 3.f; /* sq. of speed of sound */
   float local_density;          /* per grid cell sum of densities */
   float pressure;               /* fluid pressure in grid cell */
   float u_x;                    /* x-component of velocity in grid cell */
