@@ -398,7 +398,7 @@ int collision(const t_param params, t_speed * restrict cells, t_speed * restrict
 
   for (int jj = 0; jj < params.ny; jj++)
   {
-#pragma ivdep
+#pragma omp simd
     for (int ii = 0; ii < params.nx; ii++)
     {
       /* don't consider occupied cells */
@@ -428,6 +428,7 @@ int collision(const t_param params, t_speed * restrict cells, t_speed * restrict
 
         /* directional velocity components */
         float u[NSPEEDS];
+        u[0] = 0;
         u[1] = u_x;        /* east */
         u[2] = u_y;        /* north */
         u[3] = -u_x;       /* west */
@@ -440,7 +441,7 @@ int collision(const t_param params, t_speed * restrict cells, t_speed * restrict
         /* equilibrium densities */
         float d_equ[NSPEEDS];
         /* zero velocity density: weight w0 */
-        d_equ[0] = W0 * local_density * (C1_ - C1_5 * u_sq);
+        d_equ[0] = W0 * local_density * (C1_ + 3 * u[0] + C4_5 * (u[0] * u[0]) - C1_5 * u_sq);
         /* axis speeds: weight w1 */
         d_equ[1] = W1 * local_density * (C1_ + 3 * u[1] + C4_5 * (u[1] * u[1]) - C1_5 * u_sq);
         d_equ[2] = W1 * local_density * (C1_ + 3 * u[2] + C4_5 * (u[2] * u[2]) - C1_5 * u_sq);
