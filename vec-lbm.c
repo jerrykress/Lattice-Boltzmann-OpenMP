@@ -383,9 +383,9 @@ int collision(const t_param params, const int *obstacles)
                 for (int i = 1; i < NSPEEDS; i++)
                 {
                     if (i < 5)
-                        d_equ[i] = W1 * local_density * (C1_ + 3 * u[1] + C4_5 * (u[i] * u[i]) - C1_5 * u_sq);
+                        d_equ[i] = W1 * local_density * (C1_ + 3 * u[i] + C4_5 * (u[i] * u[i]) - C1_5 * u_sq);
                     else
-                        d_equ[i] = W2 * local_density * (C1_ + 3 * u[1] + C4_5 * (u[i] * u[i]) - C1_5 * u_sq);
+                        d_equ[i] = W2 * local_density * (C1_ + 3 * u[i] + C4_5 * (u[i] * u[i]) - C1_5 * u_sq);
                 }
 
                 /* relaxation step */
