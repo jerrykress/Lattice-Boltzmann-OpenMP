@@ -351,60 +351,55 @@ int collision(const t_param params, t_speed *restrict cells, t_speed *restrict t
         (cells->speeds[7])[ii + jj * params.nx] = (tmp_cells->speeds[5])[ii + jj * params.nx];
         (cells->speeds[8])[ii + jj * params.nx] = (tmp_cells->speeds[6])[ii + jj * params.nx];
       }
-        /* don't consider occupied cells */
-        if (!obstacles[ii + jj * params.nx])
+      /* don't consider occupied cells */
+      if (!obstacles[ii + jj * params.nx])
+      {
+        int index = ii + jj * params.nx;
+        /* compute local density total */
+        float local_density = (tmp_cells->speeds[0])[index];
+        
+        #pragma omp simd
+        for (int i = 1; i < NSPEEDS; i++)
         {
-          int index = ii + jj * params.nx;
-          /* compute local density total */
-          float local_density = (tmp_cells->speeds[0])[index];
-          
-          #pragma omp simd
-          for (int i = 1; i < NSPEEDS; i++)
-          {
-            local_density += (tmp_cells->speeds[i])[index];
+          local_density += (tmp_cells->speeds[i])[index];
+        }
+
+        /* compute x velocity component */
+        float u_x = ((tmp_cells->speeds[1])[index] + (tmp_cells->speeds[5])[index] + (tmp_cells->speeds[8])[index] - ((tmp_cells->speeds[3])[index] + (tmp_cells->speeds[6])[index] + (tmp_cells->speeds[7])[index])) / local_density;
+        /* compute y velocity component */
+        float u_y = ((tmp_cells->speeds[2])[index] + (tmp_cells->speeds[5])[index] + (tmp_cells->speeds[6])[index] - ((tmp_cells->speeds[4])[index] + (tmp_cells->speeds[7])[index] + (tmp_cells->speeds[8])[index])) / local_density;
+
+        /* velocity squared */
+        float u_sq = u_x * u_x + u_y * u_y;
+
+        /* directional velocity components */
+        float u[NSPEEDS];
+        u[0] = 0;
+        u[1] = u_x;        /* east */
+        u[2] = u_y;        /* north */
+        u[3] = -u_x;       /* west */
+        u[4] = -u_y;       /* south */
+        u[5] = u_x + u_y;  /* north-east */
+        u[6] = -u_x + u_y; /* north-west */
+        u[7] = -u_x - u_y; /* south-west */
+        u[8] = u_x - u_y;  /* south-east */
+
+        /* equilibrium densities */
+        float d_equ[NSPEEDS];
+        /* zero velocity density: weight w0 */
+        (cells->speeds[0])[index] = (tmp_cells->speeds[0])[index] + params.omega * ((W0 * local_density * (C1_ - C1_5 * u_sq)) - (tmp_cells->speeds[0])[index]);
+
+        /* axis speeds: weight w1 */
+        #pragma omp simd
+        for (int i = 1; i < NSPEEDS; i++)
+        {
+          if (i < 5){
+            (cells->speeds[i])[index] = (tmp_cells->speeds[i])[index] + params.omega * ((W1 * local_density * (C1_ + 3 * u[i] + C4_5 * (u[i] * u[i]) - C1_5 * u_sq)) - (tmp_cells->speeds[i])[index]);
           }
-
-          /* compute x velocity component */
-          float u_x = ((tmp_cells->speeds[1])[index] + (tmp_cells->speeds[5])[index] + (tmp_cells->speeds[8])[index] - ((tmp_cells->speeds[3])[index] + (tmp_cells->speeds[6])[index] + (tmp_cells->speeds[7])[index])) / local_density;
-          /* compute y velocity component */
-          float u_y = ((tmp_cells->speeds[2])[index] + (tmp_cells->speeds[5])[index] + (tmp_cells->speeds[6])[index] - ((tmp_cells->speeds[4])[index] + (tmp_cells->speeds[7])[index] + (tmp_cells->speeds[8])[index])) / local_density;
-
-          /* velocity squared */
-          float u_sq = u_x * u_x + u_y * u_y;
-
-          /* directional velocity components */
-          float u[NSPEEDS];
-          u[0] = 0;
-          u[1] = u_x;        /* east */
-          u[2] = u_y;        /* north */
-          u[3] = -u_x;       /* west */
-          u[4] = -u_y;       /* south */
-          u[5] = u_x + u_y;  /* north-east */
-          u[6] = -u_x + u_y; /* north-west */
-          u[7] = -u_x - u_y; /* south-west */
-          u[8] = u_x - u_y;  /* south-east */
-
-          /* equilibrium densities */
-          float d_equ[NSPEEDS];
-          /* zero velocity density: weight w0 */
-          (cells->speeds[0])[index] = (tmp_cells->speeds[0])[index] + params.omega * ((W0 * local_density * (C1_ - C1_5 * u_sq)) - (tmp_cells->speeds[0])[index]);
-
-          /* axis speeds: weight w1 */
-          #pragma omp simd
-          for (int i = 1; i < NSPEEDS; i++)
-          {
-            if (i < 5){
-              (cells->speeds[i])[index] = (tmp_cells->speeds[i])[index] + params.omega * ((W1 * local_density * (C1_ + 3 * u[i] + C4_5 * (u[i] * u[i]) - C1_5 * u_sq)) - (tmp_cells->speeds[i])[index]);
-            }
-            else{
-              (cells->speeds[i])[index] = (tmp_cells->speeds[i])[index] + params.omega * ((W2 * local_density * (C1_ + 3 * u[i] + C4_5 * (u[i] * u[i]) - C1_5 * u_sq)) - (tmp_cells->speeds[i])[index]);
-            }
+          else{
+            (cells->speeds[i])[index] = (tmp_cells->speeds[i])[index] + params.omega * ((W2 * local_density * (C1_ + 3 * u[i] + C4_5 * (u[i] * u[i]) - C1_5 * u_sq)) - (tmp_cells->speeds[i])[index]);
           }
-
-/* relaxation step */
-
-    
-
+        }
       }
     }
   }
