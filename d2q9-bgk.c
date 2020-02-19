@@ -228,7 +228,7 @@ int accelerate_flow(const t_param params, t_speed *restrict cells, const int *ob
   /* modify the 2nd row of the grid */
   int jj = params.ny - 2;
 
-#pragma ivdep
+#pragma omp simd
   for (int ii = 0; ii < params.nx; ii++)
   {
     int index = ii + jj * params.nx;
@@ -273,10 +273,10 @@ int propagate(const t_param params, t_speed *restrict cells, t_speed *restrict t
   __assume_aligned(tmp_cells->speeds[7], 32);
   __assume_aligned(tmp_cells->speeds[8], 32);
 
-#pragma omp parallel for
+#pragma omp parallel for shared(cells, tmp_cells)
   for (int jj = 0; jj < params.ny; jj++)
   {
-#pragma ivdep
+#pragma omp simd
     for (int ii = 0; ii < params.nx; ii++)
     {
       /* determine indices of axis-direction neighbours
@@ -335,12 +335,13 @@ int collision(const t_param params, t_speed *restrict cells, t_speed *restrict t
   ** NB the collision step is called after
   ** the propagate step and so values of interest
   ** are in the scratch-space grid */
+ int ii, jj;
 
-#pragma omp parallel for
-  for (int jj = 0; jj < params.ny; jj++)
+#pragma omp parallel for shared(cells, tmp_cells, obstacles)
+  for (jj = 0; jj < params.ny; jj++)
   {
     #pragma omp simd
-    for (int ii = 0; ii < params.nx; ii++)
+    for (ii = 0; ii < params.nx; ii++)
     {
       if (obstacles[jj * params.nx + ii])
       {
