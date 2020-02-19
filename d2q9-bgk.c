@@ -55,6 +55,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <omp.h>
 
 #define NSPEEDS 9
 #define FINALSTATEFILE "final_state.dat"
@@ -147,6 +148,7 @@ int main(int argc, char *argv[])
   double tic, toc;       /* floating point numbers to calculate elapsed wallclock time */
   double usrtim;         /* floating point number to record elapsed user CPU time */
   double systim;         /* floating point number to record elapsed system CPU time */
+
 
   /* parse the command line */
   if (argc != 3)
@@ -271,6 +273,7 @@ int propagate(const t_param params, t_speed *restrict cells, t_speed *restrict t
   __assume_aligned(tmp_cells->speeds[7], 32);
   __assume_aligned(tmp_cells->speeds[8], 32);
 
+#pragma omp parallel for
   for (int jj = 0; jj < params.ny; jj++)
   {
 #pragma ivdep
@@ -333,6 +336,7 @@ int collision(const t_param params, t_speed *restrict cells, t_speed *restrict t
   ** the propagate step and so values of interest
   ** are in the scratch-space grid */
 
+#pragma omp parallel for
   for (int jj = 0; jj < params.ny; jj++)
   {
     #pragma omp simd
