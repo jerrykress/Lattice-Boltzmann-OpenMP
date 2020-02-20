@@ -87,9 +87,6 @@ typedef struct
   float *speeds[NSPEEDS];
 } t_speed;
 
-float *s_speeds[NSPEEDS];
-float *d_speeds[NSPEEDS];
-
 /*
 ** function prototypes
 */
@@ -361,13 +358,15 @@ int collision(const t_param params, t_speed *restrict cells, t_speed *restrict t
       {
         int index = ii + jj * params.nx;
         /* compute local density total */
-        float local_density = (tmp_cells->speeds[0])[index];
-        
-        #pragma omp simd
-        for (int i = 1; i < NSPEEDS; i++)
-        {
-          local_density += (tmp_cells->speeds[i])[index];
-        }
+        float local_density = (tmp_cells->speeds[0])[index]
+                            + (tmp_cells->speeds[1])[index]
+                            + (tmp_cells->speeds[2])[index]
+                            + (tmp_cells->speeds[3])[index]
+                            + (tmp_cells->speeds[4])[index]
+                            + (tmp_cells->speeds[5])[index]
+                            + (tmp_cells->speeds[6])[index]
+                            + (tmp_cells->speeds[7])[index]
+                            + (tmp_cells->speeds[8])[index];
 
         /* compute x velocity component */
         float u_x = ((tmp_cells->speeds[1])[index] + (tmp_cells->speeds[5])[index] + (tmp_cells->speeds[8])[index] - ((tmp_cells->speeds[3])[index] + (tmp_cells->speeds[6])[index] + (tmp_cells->speeds[7])[index])) / local_density;
@@ -431,6 +430,7 @@ float av_velocity(const t_param params, t_speed *restrict cells, int *obstacles)
   tot_u = 0.f;
 
   /* loop over all non-blocked cells */
+#pragma omp parallel for reduction(+ : tot_cells, tot_u)
   for (int jj = 0; jj < params.ny; jj++)
   {
 #pragma ivdep
