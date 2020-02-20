@@ -103,8 +103,6 @@ int initialise(const char *paramfile, const char *obstaclefile,
 */
 int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obstacles);
 int accelerate_flow(const t_param params, t_speed *cells, const int *obstacles);
-int propagate(const t_param params, t_speed *cells, t_speed *tmp_cells);
-int rebound(const t_param params, t_speed *cells, t_speed *tmp_cells, const int *obstacles);
 int collision(const t_param params, t_speed *cells, t_speed *tmp_cells, const int *obstacles);
 int write_values(const t_param params, t_speed *cells, int *obstacles, float *av_vels);
 
@@ -201,10 +199,7 @@ int main(int argc, char *argv[])
 
 int timestep(const t_param params, t_speed *restrict cells, t_speed *restrict tmp_cells, int *obstacles)
 {
-  // printf("timestep\n");
   accelerate_flow(params, cells, obstacles);
-  // propagate(params, cells, tmp_cells);
-  // rebound(params, cells, tmp_cells, obstacles);
   collision(params, cells, tmp_cells, obstacles);
   return EXIT_SUCCESS;
 }
@@ -250,59 +245,6 @@ int accelerate_flow(const t_param params, t_speed *restrict cells, const int *ob
   return EXIT_SUCCESS;
 }
 
-int propagate(const t_param params, t_speed *restrict cells, t_speed *restrict tmp_cells)
-{
-  /* loop over _all_ cells */
-  __assume_aligned(cells->speeds[0], 64);
-  __assume_aligned(cells->speeds[1], 64);
-  __assume_aligned(cells->speeds[2], 64);
-  __assume_aligned(cells->speeds[3], 64);
-  __assume_aligned(cells->speeds[4], 64);
-  __assume_aligned(cells->speeds[5], 64);
-  __assume_aligned(cells->speeds[6], 64);
-  __assume_aligned(cells->speeds[7], 64);
-  __assume_aligned(cells->speeds[8], 64);
-
-  __assume_aligned(tmp_cells->speeds[0], 64);
-  __assume_aligned(tmp_cells->speeds[1], 64);
-  __assume_aligned(tmp_cells->speeds[2], 64);
-  __assume_aligned(tmp_cells->speeds[3], 64);
-  __assume_aligned(tmp_cells->speeds[4], 64);
-  __assume_aligned(tmp_cells->speeds[5], 64);
-  __assume_aligned(tmp_cells->speeds[6], 64);
-  __assume_aligned(tmp_cells->speeds[7], 64);
-  __assume_aligned(tmp_cells->speeds[8], 64);
-
-#pragma omp parallel for shared(cells, tmp_cells)
-  for (int jj = 0; jj < params.ny; jj++)
-  {
-#pragma omp simd
-    for (int ii = 0; ii < params.nx; ii++)
-    {
-      /* determine indices of axis-direction neighbours
-      ** respecting periodic boundary conditions (wrap around) */
-      int y_n = (jj + 1) % params.ny;
-      int x_e = (ii + 1) % params.nx;
-      int y_s = (jj == 0) ? (jj + params.ny - 1) : (jj - 1);
-      int x_w = (ii == 0) ? (ii + params.nx - 1) : (ii - 1);
-      /* propagate densities from neighbouring cells, following
-      ** appropriate directions of travel and writing into
-      ** scratch space grid */
-      tmp_cells->speeds[0][ii + jj * params.nx] = cells->speeds[0][ii + jj * params.nx];   /* central cell, no movement */
-      tmp_cells->speeds[1][ii + jj * params.nx] = cells->speeds[1][x_w + jj * params.nx];  /* east */
-      tmp_cells->speeds[2][ii + jj * params.nx] = cells->speeds[2][ii + y_s * params.nx];  /* north */
-      tmp_cells->speeds[3][ii + jj * params.nx] = cells->speeds[3][x_e + jj * params.nx];  /* west */
-      tmp_cells->speeds[4][ii + jj * params.nx] = cells->speeds[4][ii + y_n * params.nx];  /* south */
-      tmp_cells->speeds[5][ii + jj * params.nx] = cells->speeds[5][x_w + y_s * params.nx]; /* north-east */
-      tmp_cells->speeds[6][ii + jj * params.nx] = cells->speeds[6][x_e + y_s * params.nx]; /* north-west */
-      tmp_cells->speeds[7][ii + jj * params.nx] = cells->speeds[7][x_e + y_n * params.nx]; /* south-west */
-      tmp_cells->speeds[8][ii + jj * params.nx] = cells->speeds[8][x_w + y_n * params.nx]; /* south-east */
-    }
-  }
-
-  return EXIT_SUCCESS;
-}
-
 
 int collision(const t_param params, t_speed *restrict cells, t_speed *restrict tmp_cells, const int *obstacles)
 {
@@ -325,11 +267,6 @@ int collision(const t_param params, t_speed *restrict cells, t_speed *restrict t
   __assume_aligned(tmp_cells->speeds[6], 64);
   __assume_aligned(tmp_cells->speeds[7], 64);
   __assume_aligned(tmp_cells->speeds[8], 64);
-
-  // const float c_sq = 1.f / 3.f; /* square of speed of sound */
-  // const float w0 = 4.f / 9.f;   /* weighting factor */
-  // const float w1 = 1.f / 9.f;   /* weighting factor */
-  // const float w2 = 1.f / 36.f;  /* weighting factor */
 
   /* loop over the cells in the grid
   ** NB the collision step is called after
@@ -583,6 +520,7 @@ int initialise(const char *paramfile, const char *obstaclefile,
   float w1 = params->density / 9.f;
   float w2 = params->density / 36.f;
 
+#pragma omp parallel for collapse(2)
   for (int jj = 0; jj < params->ny; jj++)
   {
     for (int ii = 0; ii < params->nx; ii++)
@@ -604,6 +542,7 @@ int initialise(const char *paramfile, const char *obstaclefile,
   }
 
   /* first set all cells in obstacle array to zero */
+#pragma omp parallel for collapse(2)
   for (int jj = 0; jj < params->ny; jj++)
   {
     for (int ii = 0; ii < params->nx; ii++)
