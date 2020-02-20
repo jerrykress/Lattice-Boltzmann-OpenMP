@@ -168,6 +168,9 @@ int main(int argc, char *argv[])
   for (int tt = 0; tt < params.maxIters; tt++)
   {
     timestep(params, cells, tmp_cells, obstacles);
+    swp_cells = cells;
+    cells = tmp_cells;
+    tmp_cells = swp_cells;
     av_vels[tt] = av_velocity(params, cells, obstacles);
 #ifdef DEBUG
     printf("==timestep: %d==\n", tt);
@@ -200,7 +203,7 @@ int timestep(const t_param params, t_speed *restrict cells, t_speed *restrict tm
 {
   // printf("timestep\n");
   accelerate_flow(params, cells, obstacles);
-  propagate(params, cells, tmp_cells);
+  // propagate(params, cells, tmp_cells);
   // rebound(params, cells, tmp_cells, obstacles);
   collision(params, cells, tmp_cells, obstacles);
   return EXIT_SUCCESS;
@@ -332,79 +335,73 @@ int collision(const t_param params, t_speed *restrict cells, t_speed *restrict t
   ** NB the collision step is called after
   ** the propagate step and so values of interest
   ** are in the scratch-space grid */
- int ii, jj;
 
 #pragma omp parallel for shared(cells, tmp_cells, obstacles)
-  for (jj = 0; jj < params.ny; jj++)
+  for (int jj = 0; jj < params.ny; jj++)
   {
     #pragma omp simd
-    for (ii = 0; ii < params.nx; ii++)
+    for (int ii = 0; ii < params.nx; ii++)
     {
-      if (obstacles[jj * params.nx + ii])
-      {
-        /* called after propagate, so taking values from scratch space
-        ** mirroring, and writing into main grid */
-        (cells->speeds[1])[ii + jj * params.nx] = (tmp_cells->speeds[3])[ii + jj * params.nx];
-        (cells->speeds[2])[ii + jj * params.nx] = (tmp_cells->speeds[4])[ii + jj * params.nx];
-        (cells->speeds[3])[ii + jj * params.nx] = (tmp_cells->speeds[1])[ii + jj * params.nx];
-        (cells->speeds[4])[ii + jj * params.nx] = (tmp_cells->speeds[2])[ii + jj * params.nx];
-        (cells->speeds[5])[ii + jj * params.nx] = (tmp_cells->speeds[7])[ii + jj * params.nx];
-        (cells->speeds[6])[ii + jj * params.nx] = (tmp_cells->speeds[8])[ii + jj * params.nx];
-        (cells->speeds[7])[ii + jj * params.nx] = (tmp_cells->speeds[5])[ii + jj * params.nx];
-        (cells->speeds[8])[ii + jj * params.nx] = (tmp_cells->speeds[6])[ii + jj * params.nx];
-      }
-      /* don't consider occupied cells */
-      if (!obstacles[ii + jj * params.nx])
-      {
-        int index = ii + jj * params.nx;
-        /* compute local density total */
-        float local_density = (tmp_cells->speeds[0])[index]
-                            + (tmp_cells->speeds[1])[index]
-                            + (tmp_cells->speeds[2])[index]
-                            + (tmp_cells->speeds[3])[index]
-                            + (tmp_cells->speeds[4])[index]
-                            + (tmp_cells->speeds[5])[index]
-                            + (tmp_cells->speeds[6])[index]
-                            + (tmp_cells->speeds[7])[index]
-                            + (tmp_cells->speeds[8])[index];
+      float tp[NSPEEDS];
 
-        /* compute x velocity component */
-        float u_x = ((tmp_cells->speeds[1])[index] + (tmp_cells->speeds[5])[index] + (tmp_cells->speeds[8])[index] - ((tmp_cells->speeds[3])[index] + (tmp_cells->speeds[6])[index] + (tmp_cells->speeds[7])[index])) / local_density;
-        /* compute y velocity component */
-        float u_y = ((tmp_cells->speeds[2])[index] + (tmp_cells->speeds[5])[index] + (tmp_cells->speeds[6])[index] - ((tmp_cells->speeds[4])[index] + (tmp_cells->speeds[7])[index] + (tmp_cells->speeds[8])[index])) / local_density;
+      int y_n = (jj + 1) % params.ny;
+      int x_e = (ii + 1) % params.nx;
+      int y_s = (jj == 0) ? (jj + params.ny - 1) : (jj - 1);
+      int x_w = (ii == 0) ? (ii + params.nx - 1) : (ii - 1);
 
-        /* velocity squared */
-        float u_sq = u_x * u_x + u_y * u_y;
+      tp[0] = cells->speeds[0][ii + jj * params.nx];
+      tp[1] = cells->speeds[1][x_w + jj * params.nx];
+      tp[2] = cells->speeds[2][ii + y_s * params.nx];
+      tp[3] = cells->speeds[3][x_e + jj * params.nx];
+      tp[4] = cells->speeds[4][ii + y_n * params.nx];
+      tp[5] = cells->speeds[5][x_w + y_s * params.nx];
+      tp[6] = cells->speeds[6][x_e + y_s * params.nx];
+      tp[7] = cells->speeds[7][x_e + y_n * params.nx];
+      tp[8] = cells->speeds[8][x_w + y_n * params.nx];
 
-        /* directional velocity components */
-        float u[NSPEEDS];
-        u[0] = 0;
-        u[1] = u_x;        /* east */
-        u[2] = u_y;        /* north */
-        u[3] = -u_x;       /* west */
-        u[4] = -u_y;       /* south */
-        u[5] = u_x + u_y;  /* north-east */
-        u[6] = -u_x + u_y; /* north-west */
-        u[7] = -u_x - u_y; /* south-west */
-        u[8] = u_x - u_y;  /* south-east */
+      /* compute local density total */
+      float local_density = tp[0]
+                          + tp[1]
+                          + tp[2]
+                          + tp[3]
+                          + tp[4]
+                          + tp[5]
+                          + tp[6]
+                          + tp[7]
+                          + tp[8];
 
-        /* equilibrium densities */
-        float d_equ[NSPEEDS];
-        /* zero velocity density: weight w0 */
-        (cells->speeds[0])[index] = (tmp_cells->speeds[0])[index] + params.omega * ((W0 * local_density * (C1_ - C1_5 * u_sq)) - (tmp_cells->speeds[0])[index]);
+      /* compute x velocity component */
+      float u_x = (tp[1] + tp[5] + tp[8] - (tp[3] + tp[6] + tp[7])) / local_density;
+      /* compute y velocity component */
+      float u_y = (tp[2] + tp[5] + tp[6] - (tp[4] + tp[7] + tp[8])) / local_density;
 
-        /* axis speeds: weight w1 */
-        #pragma omp simd
-        for (int i = 1; i < NSPEEDS; i++)
-        {
-          if (i < 5){
-            (cells->speeds[i])[index] = (tmp_cells->speeds[i])[index] + params.omega * ((W1 * local_density * (C1_ + 3 * u[i] + C4_5 * (u[i] * u[i]) - C1_5 * u_sq)) - (tmp_cells->speeds[i])[index]);
-          }
-          else{
-            (cells->speeds[i])[index] = (tmp_cells->speeds[i])[index] + params.omega * ((W2 * local_density * (C1_ + 3 * u[i] + C4_5 * (u[i] * u[i]) - C1_5 * u_sq)) - (tmp_cells->speeds[i])[index]);
-          }
-        }
-      }
+      /* velocity squared */
+      float u_sq = u_x * u_x + u_y * u_y;
+
+      /* directional velocity components */
+      float u[NSPEEDS];
+      u[0] = 0;
+      u[1] = u_x;        /* east */
+      u[2] = u_y;        /* north */
+      u[3] = -u_x;       /* west */
+      u[4] = -u_y;       /* south */
+      u[5] = u_x + u_y;  /* north-east */
+      u[6] = -u_x + u_y; /* north-west */
+      u[7] = -u_x - u_y; /* south-west */
+      u[8] = u_x - u_y;  /* south-east */
+
+      (tmp_cells->speeds[0])[ii + jj * params.nx] = (obstacles[jj * params.nx + ii]) ? tp[0] : tp[0] + params.omega * ((W0 * local_density * (C1_ - C1_5 * u_sq)) - tp[0]);
+      (tmp_cells->speeds[1])[ii + jj * params.nx] = (obstacles[jj * params.nx + ii]) ? tp[3] : tp[1] + params.omega * ((W1 * local_density * (C1_ + 3 * u[1] + C4_5 * (u[1] * u[1]) - C1_5 * u_sq)) - tp[1]);
+      (tmp_cells->speeds[2])[ii + jj * params.nx] = (obstacles[jj * params.nx + ii]) ? tp[4] : tp[2] + params.omega * ((W1 * local_density * (C1_ + 3 * u[2] + C4_5 * (u[2] * u[2]) - C1_5 * u_sq)) - tp[2]);
+      (tmp_cells->speeds[3])[ii + jj * params.nx] = (obstacles[jj * params.nx + ii]) ? tp[1] : tp[3] + params.omega * ((W1 * local_density * (C1_ + 3 * u[3] + C4_5 * (u[3] * u[3]) - C1_5 * u_sq)) - tp[3]);
+      (tmp_cells->speeds[4])[ii + jj * params.nx] = (obstacles[jj * params.nx + ii]) ? tp[2] : tp[4] + params.omega * ((W1 * local_density * (C1_ + 3 * u[4] + C4_5 * (u[4] * u[4]) - C1_5 * u_sq)) - tp[4]);
+      (tmp_cells->speeds[5])[ii + jj * params.nx] = (obstacles[jj * params.nx + ii]) ? tp[7] : tp[5] + params.omega * ((W2 * local_density * (C1_ + 3 * u[5] + C4_5 * (u[5] * u[5]) - C1_5 * u_sq)) - tp[5]);
+      (tmp_cells->speeds[6])[ii + jj * params.nx] = (obstacles[jj * params.nx + ii]) ? tp[8] : tp[6] + params.omega * ((W2 * local_density * (C1_ + 3 * u[6] + C4_5 * (u[6] * u[6]) - C1_5 * u_sq)) - tp[6]);
+      (tmp_cells->speeds[7])[ii + jj * params.nx] = (obstacles[jj * params.nx + ii]) ? tp[5] : tp[7] + params.omega * ((W2 * local_density * (C1_ + 3 * u[7] + C4_5 * (u[7] * u[7]) - C1_5 * u_sq)) - tp[7]);
+      (tmp_cells->speeds[8])[ii + jj * params.nx] = (obstacles[jj * params.nx + ii]) ? tp[6] : tp[8] + params.omega * ((W2 * local_density * (C1_ + 3 * u[8] + C4_5 * (u[8] * u[8]) - C1_5 * u_sq)) - tp[8]);
+
+    
+
     }
   }
 
