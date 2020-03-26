@@ -1,28 +1,37 @@
-# HPC Coursework
+# Advanced HPC Coursework: LBM
 
-Base coursework for the Advanced High Performance Computing class.
+This is the base coursework for the Advanced High Performance Computing class.
+In this repository you will find:
 
-* Source code is in the `d2q9-bgk.c` file
+* Source code in the `d2q9-bgk.c` file
 * Results checking scripts are in the `check/` directory
 
 ## Compiling and running
 
-To compile type `make`. Editing the values for `CC` and `CFLAGS` in the Makefile can be used to enable different compiler options or use a different compiler. These can also be passed on the command line:
+You will need to load a CUDA module to compile OpenCL programs:
+
+    module load libs/cuda/10.0-gcc-5.4.0-2.26
+
+To compile type `make`.
+Editing the values for `CC` and `CFLAGS` in the Makefile can be used to enable different compiler options or use a different compiler.
+These can also be passed on the command line:
 
     $ make CFLAGS="-O3 -fopenmp -DDEBUG"
 
-Input parameter and obstacle files are all specified on the command line of the `d2q9-bgk` executable.
-
-Usage:
+Input parameters and obstacle files are all specified on the command line of the `d2q9-bgk` executable:
 
     $ ./d2q9-bgk <paramfile> <obstaclefile>
-eg:
+
+For example:
 
     $ ./d2q9-bgk input_256x256.params obstacles_256x256.dat
 
 ## Checking results
 
-An automated result checking function is provided that requires you to load a particular Python module (`module load languages/anaconda2`). Running `make check` will check the output file (average velocities and final state) against some reference results. By default, it should look something like this:
+An automated result checking script is provided to validate your results.
+The script is written in Python, so you will need to load the `languages/python-2.7.6` module before using it.
+Running `make check` will check the output file (average velocities and final state) against some reference results.
+By default, it should look something like this:
 
     $ make check
     python check/check.py --ref-av-vels-file=check/128x128.av_vels.dat --ref-final-state-file=check/128x128.final_state.dat --av-vels-file=./av_vels.dat --final-state-file=./final_state.dat
@@ -36,19 +45,19 @@ An automated result checking function is provided that requires you to load a pa
 
     Both tests passed!
 
-This script takes both the reference results and the results to check (both average velocities and final state). This is also specified in the makefile and can be changed like the other options:
+This script takes both the reference results and the results to check (both average velocities and final state).
+This is also specified in the makefile and can be changed like the other options:
 
     $ make check REF_AV_VELS_FILE=check/128x256.av_vels.dat REF_FINAL_STATE_FILE=check/128x256.final_state.dat
     python check/check.py --ref-av-vels-file=check/128x256.av_vels.dat --ref-final-state-file=check/128x256.final_state.dat --av-vels-file=./av_vels.dat --final-state-file=./final_state.dat
     ...
 
-All the options for this script can be examined by passing the --help flag to it.
+All the options for this script can be examined by passing the `--help` flag to it.
 
     $ python check/check.py --help
     usage: check.py [-h] [--tolerance TOLERANCE] --ref-av-vels-file
                     REF_AV_VELS_FILE --ref-final-state-file REF_FINAL_STATE_FILE
     ...
-
 
 ## Running on BlueCrystal Phase 4
 
@@ -71,7 +80,8 @@ modify `job_submit_d2q9-bgk` to update the value assigned to `options`.
 
 ## Checking submission content
 
-Before handing in the coursework, you can use the `check_submission.sh` script to make sure that your code builds in a clean environment. This will reduce the chances of the automarker failing to build or run your code.
+Before handing in the coursework, you can use the `check_submission.sh` script to make sure that your code builds in a clean environment.
+This will reduce the chances of the automarker failing to build or run your code.
 
 To use the script, simply run it from the directory containing the files you intend to submit:
 
@@ -86,7 +96,6 @@ The script will:
 If the submission checking script prints any errors, you should try to address those before you hand in. 
 
 Note that `check_submission.sh` does _not_ run your code, and so you _cannot_ verify that the results produced by your application validate just by running this script. You should check the correctness of your results separately, e.g. using `make check`.
-
 
 # Serial output for sample inputs
 Run times were taken on a Phase 4 node using the base (gcc) compiler and base compiler flags as found in the Makefile:
@@ -131,8 +140,10 @@ Elapsed user CPU time:		1287.568113 (s)
 Elapsed system CPU time:	0.029001 (s)
 ```
 
-# Visualisation
+
+## Visualisation
 
 You can view the final state of the simulation by creating a .png image file using a provided Gnuplot script:
 
     $ gnuplot final_state.plt
+

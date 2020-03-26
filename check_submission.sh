@@ -7,7 +7,7 @@
 # This script will unload all modules and source 'env.sh' (if present). It will
 # then run `make` and check that there is an executable with the correct name.
 
-set -eu
+set -e
 
 EXE=d2q9-bgk
 ENV=env.sh
@@ -15,10 +15,10 @@ ENV=env.sh
 module list |& tail -n +2
 
 echo "Unloading all modules"
-module purge
+module purge &>/dev/null
 
-echo "Loading default languages/intel module"
-module load languages/intel
+echo "Loading default cuda module"
+module load libs/cuda/10.0-gcc-5.4.0-2.26
 
 if [ -r "$ENV" ]; then
     echo "Sourcing $ENV"
@@ -54,7 +54,7 @@ else
 	Please ensure that you submit all source files in the submission directory:
 	    - Makefile
 	    - d2q9-bgk.c
-	    - env.sh (if used)
+	    - env.sh
 	    - Any other files needed to build that you've added, e.g. OpenCL kernel files.
 
 	Please also submit your report with the filename 'report.pdf'.
