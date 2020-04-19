@@ -197,3 +197,12 @@ kernel void collision(global t_speed* cells,
       }
 
 }
+
+
+kernel void av_velocity(global t_speed* cells,
+                        global float* tot_u,
+                        global int* obstacles,
+                        int nx)
+{
+
+}
