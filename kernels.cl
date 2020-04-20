@@ -204,5 +204,41 @@ kernel void av_velocity(global t_speed* cells,
                         global int* obstacles,
                         int nx)
 {
+  /* loop over the cells in the grid */
+  int ii = get_global_id(0);
+  int jj = get_global_id(1);
+
+  /* ignore occupied cells */
+  if (!obstacles[ii + jj*nx])
+  {
+    /* local density total */
+    float local_density = 0.f;
+
+    for (int kk = 0; kk < NSPEEDS; kk++)
+    {
+      local_density += cells[ii + jj*nx].speeds[kk];
+    }
+
+    /* x-component of velocity */
+    float u_x = (cells[ii + jj*nx].speeds[1]
+                  + cells[ii + jj*nx].speeds[5]
+                  + cells[ii + jj*nx].speeds[8]
+                  - (cells[ii + jj*nx].speeds[3]
+                      + cells[ii + jj*nx].speeds[6]
+                      + cells[ii + jj*nx].speeds[7]))
+                  / local_density;
+    /* compute y velocity component */
+    float u_y = (cells[ii + jj*nx].speeds[2]
+                  + cells[ii + jj*nx].speeds[5]
+                  + cells[ii + jj*nx].speeds[6]
+                  - (cells[ii + jj*nx].speeds[4]
+                      + cells[ii + jj*nx].speeds[7]
+                      + cells[ii + jj*nx].speeds[8]))
+                  / local_density;
+    /* accumulate the norm of x- and y- velocity components */
+    tot_u[ii + jj*nx] = sqrtf((u_x * u_x) + (u_y * u_y));
+  }
+
+  tot_u[ii + jj*nx] = 0;
 
 }
