@@ -403,11 +403,11 @@ float av_velocity(const t_param params, t_speed *cells, float *tot_u, int *obsta
   {
     for (int ii = 0; ii < params.nx; ii++)
     {
-    if (tot_u[ii + jj * params.nx] != 0)
-    {
-      tot += tot_u[ii + jj * params.nx];
-      tot_cells++;
-    }
+      if (!obstacles[ii + jj * params.nx])
+      {
+        tot += tot_u[ii + jj * params.nx];
+        tot_cells++;
+      }
     }
   }
 
