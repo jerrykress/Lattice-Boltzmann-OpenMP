@@ -241,9 +241,9 @@ int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obst
   rebound(params, cells, tmp_cells, obstacles, ocl);
   collision(params, cells, tmp_cells, obstacles, ocl);
 
-  // Read cells from device
-  err = clEnqueueReadBuffer(ocl.queue, ocl.cells, CL_TRUE, 0, sizeof(t_speed) * params.nx * params.ny, cells, 0, NULL, NULL);
-  checkError(err, "reading tmp_cells data", __LINE__);
+  // // Read cells from device
+  // err = clEnqueueReadBuffer(ocl.queue, ocl.cells, CL_TRUE, 0, sizeof(t_speed) * params.nx * params.ny, cells, 0, NULL, NULL);
+  // checkError(err, "reading tmp_cells data", __LINE__);
   return EXIT_SUCCESS;
 }
 
