@@ -230,20 +230,11 @@ int main(int argc, char *argv[])
 
 int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obstacles, t_ocl ocl)
 {
-  cl_int err;
-
-  // // Write cells to device
-  // err = clEnqueueWriteBuffer(ocl.queue, ocl.cells, CL_TRUE, 0, sizeof(t_speed) * params.nx * params.ny, cells, 0, NULL, NULL);
-  // checkError(err, "writing cells data", __LINE__);
-
   accelerate_flow(params, cells, obstacles, ocl);
   propagate(params, cells, tmp_cells, ocl);
   rebound(params, cells, tmp_cells, obstacles, ocl);
   collision(params, cells, tmp_cells, obstacles, ocl);
 
-  // // Read cells from device
-  // err = clEnqueueReadBuffer(ocl.queue, ocl.cells, CL_TRUE, 0, sizeof(t_speed) * params.nx * params.ny, cells, 0, NULL, NULL);
-  // checkError(err, "reading tmp_cells data", __LINE__);
   return EXIT_SUCCESS;
 }
 
@@ -271,9 +262,9 @@ int accelerate_flow(const t_param params, t_speed *cells, int *obstacles, t_ocl 
                                1, NULL, global, NULL, 0, NULL, NULL);
   checkError(err, "enqueueing accelerate_flow kernel", __LINE__);
 
-  // Wait for kernel to finish
-  err = clFinish(ocl.queue);
-  checkError(err, "waiting for accelerate_flow kernel", __LINE__);
+  // // Wait for kernel to finish
+  // err = clFinish(ocl.queue);
+  // checkError(err, "waiting for accelerate_flow kernel", __LINE__);
 
   return EXIT_SUCCESS;
 }
@@ -300,9 +291,9 @@ int propagate(const t_param params, t_speed *cells, t_speed *tmp_cells, t_ocl oc
                                2, NULL, global, NULL, 0, NULL, NULL);
   checkError(err, "enqueueing propagate kernel", __LINE__);
 
-  // Wait for kernel to finish
-  err = clFinish(ocl.queue);
-  checkError(err, "waiting for propagate kernel", __LINE__);
+  // // Wait for kernel to finish
+  // err = clFinish(ocl.queue);
+  // checkError(err, "waiting for propagate kernel", __LINE__);
 
   return EXIT_SUCCESS;
 }
@@ -330,9 +321,9 @@ int rebound(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obsta
                                2, NULL, global, NULL, 0, NULL, NULL);
   checkError(err, "enqueueing rebound kernel", __LINE__);
 
-  // Wait for kernel to finish
-  err = clFinish(ocl.queue);
-  checkError(err, "waiting for rebound kernel", __LINE__);
+  // // Wait for kernel to finish
+  // err = clFinish(ocl.queue);
+  // checkError(err, "waiting for rebound kernel", __LINE__);
 
   return EXIT_SUCCESS;
 }
@@ -360,9 +351,9 @@ int collision(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obs
   err = clEnqueueNDRangeKernel(ocl.queue, ocl.collision, 2, NULL, global, NULL, 0, NULL, NULL);
   checkError(err, "enqueueing collision kernel", __LINE__);
 
-  // Wait for kernel to finish
-  err = clFinish(ocl.queue);
-  checkError(err, "waiting for collision kernel", __LINE__);
+  // // Wait for kernel to finish
+  // err = clFinish(ocl.queue);
+  // checkError(err, "waiting for collision kernel", __LINE__);
 
   return EXIT_SUCCESS;
 }
@@ -388,9 +379,9 @@ float av_velocity(const t_param params, t_speed *cells, float *tot_u, int *obsta
   err = clEnqueueNDRangeKernel(ocl.queue, ocl.av_velocity, 2, NULL, global, NULL, 0, NULL, NULL);
   checkError(err, "enqueueing av_velocity kernel", __LINE__);
 
-  // Wait for kernel to finish
-  err = clFinish(ocl.queue);
-  checkError(err, "waiting for av_velocity kernel", __LINE__);
+  // // Wait for kernel to finish
+  // err = clFinish(ocl.queue);
+  // checkError(err, "waiting for av_velocity kernel", __LINE__);
 
   // Read cells from device
   err = clEnqueueReadBuffer(ocl.queue, ocl.tot_u, CL_TRUE, 0, sizeof(cl_float) * params.nx * params.ny, tot_u, 0, NULL, NULL);
