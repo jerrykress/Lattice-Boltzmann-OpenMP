@@ -120,7 +120,6 @@ int initialise(const char *paramfile, const char *obstaclefile,
 ** timestep calls, in order, the functions:
 ** accelerate_flow(), propagate(), rebound() & collision()
 */
-int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obstacles, t_ocl ocl);
 int accelerate_flow(const t_param params, t_speed *cells, int *obstacles, t_ocl ocl);
 int propagate(const t_param params, t_speed *cells, t_speed *tmp_cells, t_ocl ocl);
 int rebound(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obstacles, t_ocl ocl);
@@ -199,8 +198,12 @@ int main(int argc, char *argv[])
 
   for (int tt = 0; tt < params.maxIters; tt++)
   {
-    timestep(params, cells, tmp_cells, obstacles, ocl);
+    accelerate_flow(params, cells, obstacles, ocl);
+    propagate(params, cells, tmp_cells, ocl);
+    rebound(params, cells, tmp_cells, obstacles, ocl);
+    collision(params, cells, tmp_cells, obstacles, ocl);
     av_vels[tt] = av_velocity(params, cells, tot_u, obstacles, ocl);
+
 #ifdef DEBUG
     printf("==timestep: %d==\n", tt);
     printf("av velocity: %.12E\n", av_vels[tt]);
@@ -224,16 +227,6 @@ int main(int argc, char *argv[])
   printf("Elapsed system CPU time:\t%.6lf (s)\n", systim);
   write_values(params, cells, obstacles, av_vels);
   finalise(&params, &cells, &tmp_cells, &obstacles, &tot_u, &av_vels, ocl);
-
-  return EXIT_SUCCESS;
-}
-
-int timestep(const t_param params, t_speed *cells, t_speed *tmp_cells, int *obstacles, t_ocl ocl)
-{
-  accelerate_flow(params, cells, obstacles, ocl);
-  propagate(params, cells, tmp_cells, ocl);
-  rebound(params, cells, tmp_cells, obstacles, ocl);
-  collision(params, cells, tmp_cells, obstacles, ocl);
 
   return EXIT_SUCCESS;
 }
