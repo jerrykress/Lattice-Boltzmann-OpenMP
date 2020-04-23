@@ -68,6 +68,9 @@
 #define AVVELSFILE "av_vels.dat"
 #define OCLFILE "kernels.cl"
 
+#define LOC_SIZE_X 32
+#define LOC_SIZE_Y 4
+
 /* struct to hold the parameter values */
 typedef struct
 {
@@ -78,6 +81,9 @@ typedef struct
   float density;    /* density per link */
   float accel;      /* density redistribution */
   float omega;      /* relaxation parameter */
+  int tot_cells;    /* total number of non obstacle cells */
+  size_t group_size; /* size of each local work group */
+  size_t group_count; /* total number of work groups */
 } t_param;
 
 /* struct to hold OpenCL objects */
@@ -362,14 +368,17 @@ float av_velocity(const t_param params, t_speed *cells, float *tot_u, int *obsta
   checkError(err, "setting av_velocity arg 1", __LINE__);
   err = clSetKernelArg(ocl.av_velocity, 2, sizeof(cl_mem), &ocl.obstacles);
   checkError(err, "setting av_velocity arg 2", __LINE__);
-  err = clSetKernelArg(ocl.av_velocity, 3, sizeof(cl_int), &params.nx);
+  err = clSetKernelArg(ocl.av_velocity, 3, sizeof(cl_float) * params.group_size, NULL);
   checkError(err, "setting av_velocity arg 3", __LINE__);
-  err = clSetKernelArg(ocl.av_velocity, 4, sizeof(cl_int), &params.ny);
+  err = clSetKernelArg(ocl.av_velocity, 4, sizeof(cl_int), &params.nx);
   checkError(err, "setting av_velocity arg 4", __LINE__);
+  err = clSetKernelArg(ocl.av_velocity, 5, sizeof(cl_int), &params.ny);
+  checkError(err, "setting av_velocity arg 5", __LINE__);
 
   // Enqueue kernel
   size_t global[2] = {params.nx, params.ny};
-  err = clEnqueueNDRangeKernel(ocl.queue, ocl.av_velocity, 2, NULL, global, NULL, 0, NULL, NULL);
+  size_t local[2]  = {LOC_SIZE_X, LOC_SIZE_Y};
+  err = clEnqueueNDRangeKernel(ocl.queue, ocl.av_velocity, 2, NULL, global, local, 0, NULL, NULL);
   checkError(err, "enqueueing av_velocity kernel", __LINE__);
 
   // // Wait for kernel to finish
@@ -377,25 +386,16 @@ float av_velocity(const t_param params, t_speed *cells, float *tot_u, int *obsta
   // checkError(err, "waiting for av_velocity kernel", __LINE__);
 
   // Read cells from device
-  err = clEnqueueReadBuffer(ocl.queue, ocl.tot_u, CL_TRUE, 0, sizeof(cl_float) * params.nx * params.ny, tot_u, 0, NULL, NULL);
+  err = clEnqueueReadBuffer(ocl.queue, ocl.tot_u, CL_TRUE, 0, sizeof(float) * params.group_count, tot_u, 0, NULL, NULL);
   checkError(err, "reading tot_u data", __LINE__);
 
-  int tot_cells = 0;
   float tot = 0;
 
-  for (int jj = 0; jj < params.ny; jj++)
-  {
-    for (int ii = 0; ii < params.nx; ii++)
-    {
-      if (!obstacles[ii + jj * params.nx])
-      {
-        tot += tot_u[ii + jj * params.nx];
-        tot_cells++;
-      }
-    }
+  for (int i = 0; i < params.group_count; i++){
+    tot += tot_u[i];
   }
 
-  return tot / (float)tot_cells;
+  return tot / (float)params.tot_cells;
 }
 
 int initialise(const char *paramfile, const char *obstaclefile, t_param *params, t_speed **cells_ptr, t_speed **tmp_cells_ptr, int **obstacles_ptr, float **tot_u, float **av_vels_ptr, t_ocl *ocl)
@@ -491,6 +491,10 @@ int initialise(const char *paramfile, const char *obstaclefile, t_param *params,
   float w1 = params->density / 9.f;
   float w2 = params->density / 36.f;
 
+  params->tot_cells   = params->nx * params->ny;
+  params->group_size  = LOC_SIZE_X * LOC_SIZE_Y;
+  params->group_count = (params->nx / LOC_SIZE_X) * (params->ny / LOC_SIZE_Y);
+
   for (int jj = 0; jj < params->ny; jj++)
   {
     for (int ii = 0; ii < params->nx; ii++)
@@ -555,6 +559,7 @@ int initialise(const char *paramfile, const char *obstaclefile, t_param *params,
 
     /* assign to array */
     (*obstacles_ptr)[xx + yy * params->nx] = blocked;
+    params->tot_cells--;
   }
 
   /* and close the file */

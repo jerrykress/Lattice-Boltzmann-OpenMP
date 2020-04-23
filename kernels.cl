@@ -179,20 +179,40 @@ kernel void collision(global t_speed* cells, global t_speed* tmp_cells, global i
 }
 
 
-kernel void av_velocity(global t_speed* cells, global float* tot_u, global int* obstacles, int nx, int ny) {
+kernel void av_velocity(global t_speed* cells, global float* tot_u, global int* obstacles, local float* loc_u, int nx, int ny) {
   /* loop over the cells in the grid */
   int ii = get_global_id(0);
   int jj = get_global_id(1);
+  int local_ii = get_local_id(0);
+  int local_jj = get_local_id(1);
+  int local_nx = get_local_size(0);
+  int local_ny = get_local_size(1);
+  int group_ii = get_group_id(0);
+  int group_jj = get_group_id(1);
+
+  loc_u[local_ii + (local_nx * local_jj)] = 0.f;
 
   if (!obstacles[ii + jj*nx]) {
     float local_density = 0.f;
+
     for (int kk = 0; kk < NSPEEDS; kk++) {
       local_density += cells[ii + jj*nx].speeds[kk];
     }
+
     float u_x = (cells[ii + jj*nx].speeds[1] + cells[ii + jj*nx].speeds[5] + cells[ii + jj*nx].speeds[8] - (cells[ii + jj*nx].speeds[3] + cells[ii + jj*nx].speeds[6] + cells[ii + jj*nx].speeds[7])) / local_density;
     float u_y = (cells[ii + jj*nx].speeds[2] + cells[ii + jj*nx].speeds[5] + cells[ii + jj*nx].speeds[6] - (cells[ii + jj*nx].speeds[4] + cells[ii + jj*nx].speeds[7] + cells[ii + jj*nx].speeds[8])) / local_density;
-    tot_u[ii + jj*nx] = sqrt((u_x * u_x) + (u_y * u_y));
-  } else {
-    tot_u[ii + jj*nx] = 0;
+    
+    loc_u[local_ii + (local_nx * local_jj)] = sqrt((u_x * u_x) + (u_y * u_y));
+  }
+
+  barrier(CLK_LOCAL_MEM_FENCE);
+
+  float group_sum = 0.f;
+
+  if (local_ii == 0 && local_jj == 0){
+    for (int i = 0; i < local_nx * local_ny; i++) {
+        group_sum += loc_u[i];             
+    }
+    tot_u[group_ii + ((nx / local_nx) * group_jj)] = group_sum;                                       
   }
 }
