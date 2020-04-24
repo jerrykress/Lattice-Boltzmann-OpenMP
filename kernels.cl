@@ -43,59 +43,6 @@ kernel void accelerate_flow(global float* cells,
   }
 }
 
-kernel void propagate(global float* cells,
-                      global float* tmp_cells,
-                      global int* obstacles,
-                      int nx, int ny)
-{
-  /* get column and row indices */
-  int ii = get_global_id(0);
-  int jj = get_global_id(1);
-
-  /* determine indices of axis-direction neighbours
-  ** respecting periodic boundary conditions (wrap around) */
-  int y_n = (jj + 1) % ny;
-  int x_e = (ii + 1) % nx;
-  int y_s = (jj == 0) ? (jj + ny - 1) : (jj - 1);
-  int x_w = (ii == 0) ? (ii + nx - 1) : (ii - 1);
-
-  /* propagate densities from neighbouring cells, following
-  ** appropriate directions of travel and writing into
-  ** scratch space grid */
-  tmp_cells[(0 * nx * ny) + ii + jj*nx] = cells[(0 * nx * ny) + ii + jj*nx]; /* central cell, no movement */
-  tmp_cells[(1 * nx * ny) + ii + jj*nx] = cells[(1 * nx * ny) + x_w + jj*nx]; /* east */
-  tmp_cells[(2 * nx * ny) + ii + jj*nx] = cells[(2 * nx * ny) + ii + y_s*nx]; /* north */
-  tmp_cells[(3 * nx * ny) + ii + jj*nx] = cells[(3 * nx * ny) + x_e + jj*nx]; /* west */
-  tmp_cells[(4 * nx * ny) + ii + jj*nx] = cells[(4 * nx * ny) + ii + y_n*nx]; /* south */
-  tmp_cells[(5 * nx * ny) + ii + jj*nx] = cells[(5 * nx * ny) + x_w + y_s*nx]; /* north-east */
-  tmp_cells[(6 * nx * ny) + ii + jj*nx] = cells[(6 * nx * ny) + x_e + y_s*nx]; /* north-west */
-  tmp_cells[(7 * nx * ny) + ii + jj*nx] = cells[(7 * nx * ny) + x_e + y_n*nx]; /* south-west */
-  tmp_cells[(8 * nx * ny) + ii + jj*nx] = cells[(8 * nx * ny) + x_w + y_n*nx]; /* south-east */
-}
-
-kernel void rebound(global float* cells, global float* tmp_cells, global int* obstacles,int nx, int ny)
-{
-  /* loop over the cells in the grid */
-  int ii = get_global_id(0);
-  int jj = get_global_id(1);
-
-  /* if the cell contains an obstacle */
-  if (obstacles[jj*nx + ii])
-  {
-    /* called after propagate, so taking values from scratch space
-    ** mirroring, and writing into main grid */
-    cells[(1 * nx * ny) + ii + jj*nx] = tmp_cells[(3 * nx * ny) + ii + jj*nx];
-    cells[(2 * nx * ny) + ii + jj*nx] = tmp_cells[(4 * nx * ny) + ii + jj*nx];
-    cells[(3 * nx * ny) + ii + jj*nx] = tmp_cells[(1 * nx * ny) + ii + jj*nx];
-    cells[(4 * nx * ny) + ii + jj*nx] = tmp_cells[(2 * nx * ny) + ii + jj*nx];
-    cells[(5 * nx * ny) + ii + jj*nx] = tmp_cells[(7 * nx * ny) + ii + jj*nx];
-    cells[(6 * nx * ny) + ii + jj*nx] = tmp_cells[(8 * nx * ny) + ii + jj*nx];
-    cells[(7 * nx * ny) + ii + jj*nx] = tmp_cells[(5 * nx * ny) + ii + jj*nx];
-    cells[(8 * nx * ny) + ii + jj*nx] = tmp_cells[(6 * nx * ny) + ii + jj*nx];
-  }
-}
-
-
 kernel void collision(global float* cells, global float* tmp_cells, global int* obstacles,int nx, int ny, float omega) {
   const float c_sq = 1.f / 3.f; /* square of speed of sound */
   const float w0 = 4.f / 9.f;  /* weighting factor */
