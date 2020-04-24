@@ -59,15 +59,15 @@ kernel void propagate(global float* cells,
   /* propagate densities from neighbouring cells, following
   ** appropriate directions of travel and writing into
   ** scratch space grid */
-  tmp_cells[(0 * nx * ny) + ii + jj*nx] = cells[(0 * nx + ny) + ii + jj*nx]; /* central cell, no movement */
-  tmp_cells[(1 * nx * ny) + ii + jj*nx] = cells[(1 * nx + ny) + x_w + jj*nx]; /* east */
-  tmp_cells[(2 * nx * ny) + ii + jj*nx] = cells[(2 * nx + ny) + ii + y_s*nx]; /* north */
-  tmp_cells[(3 * nx * ny) + ii + jj*nx] = cells[(3 * nx + ny) + x_e + jj*nx]; /* west */
-  tmp_cells[(4 * nx * ny) + ii + jj*nx] = cells[(4 * nx + ny) + ii + y_n*nx]; /* south */
-  tmp_cells[(5 * nx * ny) + ii + jj*nx] = cells[(5 * nx + ny) + x_w + y_s*nx]; /* north-east */
-  tmp_cells[(6 * nx * ny) + ii + jj*nx] = cells[(6 * nx + ny) + x_e + y_s*nx]; /* north-west */
-  tmp_cells[(7 * nx * ny) + ii + jj*nx] = cells[(7 * nx + ny) + x_e + y_n*nx]; /* south-west */
-  tmp_cells[(8 * nx * ny) + ii + jj*nx] = cells[(8 * nx + ny) + x_w + y_n*nx]; /* south-east */
+  tmp_cells[(0 * nx * ny) + ii + jj*nx] = cells[(0 * nx * ny) + ii + jj*nx]; /* central cell, no movement */
+  tmp_cells[(1 * nx * ny) + ii + jj*nx] = cells[(1 * nx * ny) + x_w + jj*nx]; /* east */
+  tmp_cells[(2 * nx * ny) + ii + jj*nx] = cells[(2 * nx * ny) + ii + y_s*nx]; /* north */
+  tmp_cells[(3 * nx * ny) + ii + jj*nx] = cells[(3 * nx * ny) + x_e + jj*nx]; /* west */
+  tmp_cells[(4 * nx * ny) + ii + jj*nx] = cells[(4 * nx * ny) + ii + y_n*nx]; /* south */
+  tmp_cells[(5 * nx * ny) + ii + jj*nx] = cells[(5 * nx * ny) + x_w + y_s*nx]; /* north-east */
+  tmp_cells[(6 * nx * ny) + ii + jj*nx] = cells[(6 * nx * ny) + x_e + y_s*nx]; /* north-west */
+  tmp_cells[(7 * nx * ny) + ii + jj*nx] = cells[(7 * nx * ny) + x_e + y_n*nx]; /* south-west */
+  tmp_cells[(8 * nx * ny) + ii + jj*nx] = cells[(8 * nx * ny) + x_w + y_n*nx]; /* south-east */
 }
 
 kernel void rebound(global float* cells, global float* tmp_cells, global int* obstacles,int nx, int ny)
@@ -202,12 +202,12 @@ kernel void av_velocity(global float* cells, global float* tot_u, global int* ob
                + cells[(6 * nx * ny) + ii + jj*nx] 
                + cells[(7 * nx * ny) + ii + jj*nx])) / local_density;
 
-    float u_y = (cells[(2 * nx * ny ) + ii + jj*nx] 
-               + cells[(5 * nx * ny ) + ii + jj*nx] 
-               + cells[(6 * nx * ny ) + ii + jj*nx] 
-              - (cells[(4 * nx * ny ) + ii + jj*nx] 
-               + cells[(7 * nx * ny ) + ii + jj*nx] 
-               + cells[(8 * nx * ny ) + ii + jj*nx])) / local_density;
+    float u_y = (cells[(2 * nx * ny) + ii + jj*nx] 
+               + cells[(5 * nx * ny) + ii + jj*nx] 
+               + cells[(6 * nx * ny) + ii + jj*nx] 
+              - (cells[(4 * nx * ny) + ii + jj*nx] 
+               + cells[(7 * nx * ny) + ii + jj*nx] 
+               + cells[(8 * nx * ny) + ii + jj*nx])) / local_density;
     
     loc_u[local_ii + (local_nx * local_jj)] = sqrt((u_x * u_x) + (u_y * u_y));
   }
@@ -220,6 +220,6 @@ kernel void av_velocity(global float* cells, global float* tot_u, global int* ob
     for (int i = 0; i < local_nx * local_ny; i++) {
         group_sum += loc_u[i];             
     }
-    tot_u[group_ii + ((nx / local_nx) * group_jj)] = group_sum;                                       
+    tot_u[group_ii + (int)(nx / local_nx) * group_jj] = group_sum;                                       
   }
 }

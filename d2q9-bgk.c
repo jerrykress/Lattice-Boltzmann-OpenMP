@@ -71,8 +71,6 @@
 #define LOC_SIZE_X 32
 #define LOC_SIZE_Y 4
 
-#define DEBUG
-
 /* struct to hold the parameter values */
 typedef struct
 {
@@ -457,12 +455,6 @@ int initialise(const char *paramfile, const char *obstaclefile, t_param *params,
   if (*obstacles_ptr == NULL)
     die("cannot allocate column memory for obstacles", __LINE__, __FILE__);
 
-  /* the map of obstacles */
-  *tot_u = (float*)malloc(sizeof(float) * (params->ny * params->nx));
-
-  if (*tot_u == NULL)
-    die("cannot allocate column memory for tot_u", __LINE__, __FILE__);
-
   /* initialise densities */
   float w0 = params->density * 4.f / 9.f;
   float w1 = params->density / 9.f;
@@ -471,6 +463,12 @@ int initialise(const char *paramfile, const char *obstaclefile, t_param *params,
   params->tot_cells   = params->nx * params->ny;
   params->group_size  = LOC_SIZE_X * LOC_SIZE_Y;
   params->group_count = (params->nx / LOC_SIZE_X) * (params->ny / LOC_SIZE_Y);
+
+  /* the map of obstacles */
+  *tot_u = (float*)malloc(sizeof(float) * params->group_count);
+
+  if (*tot_u == NULL)
+    die("cannot allocate column memory for tot_u", __LINE__, __FILE__);
 
   for (int jj = 0; jj < params->ny; jj++)
   {
@@ -497,15 +495,6 @@ int initialise(const char *paramfile, const char *obstaclefile, t_param *params,
     for (int ii = 0; ii < params->nx; ii++)
     {
       (*obstacles_ptr)[ii + jj * params->nx] = 0;
-    }
-  }
-
-  /* set all cells in tot_u array to zero */
-  for (int jj = 0; jj < params->ny; jj++)
-  {
-    for (int ii = 0; ii < params->nx; ii++)
-    {
-      (*tot_u)[ii + jj * params->nx] = 0;
     }
   }
 
