@@ -306,7 +306,8 @@ int collision_out(const t_param params, float *cells, float *tmp_cells, int *obs
 
   // Enqueue kernel
   size_t global[2] = {params.nx, params.ny};
-  err = clEnqueueNDRangeKernel(ocl.queue, ocl.collision, 2, NULL, global, NULL, 0, NULL, NULL);
+  size_t local[2] = {LOC_SIZE_X, LOC_SIZE_Y};
+  err = clEnqueueNDRangeKernel(ocl.queue, ocl.collision, 2, NULL, global, local, 0, NULL, NULL);
   checkError(err, "enqueueing collision kernel", __LINE__);
 
   return EXIT_SUCCESS;
@@ -332,7 +333,8 @@ int collision_in(const t_param params, float *cells, float *tmp_cells, int *obst
 
   // Enqueue kernel
   size_t global[2] = {params.nx, params.ny};
-  err = clEnqueueNDRangeKernel(ocl.queue, ocl.collision, 2, NULL, global, NULL, 0, NULL, NULL);
+  size_t local[2] = {LOC_SIZE_X, LOC_SIZE_Y};
+  err = clEnqueueNDRangeKernel(ocl.queue, ocl.collision, 2, NULL, global, local, 0, NULL, NULL);
   checkError(err, "enqueueing collision kernel", __LINE__);
 
   return EXIT_SUCCESS;
