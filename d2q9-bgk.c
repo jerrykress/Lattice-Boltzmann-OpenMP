@@ -119,10 +119,10 @@ int initialise(const char *paramfile, const char *obstaclefile,
 ** timestep calls, in order, the functions:
 ** accelerate_flow() & collision()
 */
-int accelerate_flow_out(const t_param params, float *cells, int *obstacles, t_ocl ocl);
-int accelerate_flow_in(const t_param params, float *cells, int *obstacles, t_ocl ocl);
-int collision_out(const t_param params, float *cells, float *tmp_cells, int *obstacles, t_ocl ocl);
-int collision_in(const t_param params, float *cells, float *tmp_cells, int *obstacles, t_ocl ocl);
+int accelerate_flow_out(const t_param params, t_ocl ocl);
+int accelerate_flow_in(const t_param params, t_ocl ocl);
+int collision_out(const t_param params, t_ocl ocl);
+int collision_in(const t_param params, t_ocl ocl);
 int write_values(const t_param params, float *cells, int *obstacles, float *av_vels);
 
 /* finalise, including freeing up allocated memory */
@@ -134,8 +134,8 @@ int finalise(const t_param *params, float **cells_ptr, float **tmp_cells_ptr,
 float total_density(const t_param params, float *cells);
 
 /* compute average velocity */
-float av_velocity_out(const t_param params, float *cells, float *tot_u, int *obstacles, t_ocl ocl);
-float av_velocity_in(const t_param params, float *cells, float *tot_u, int *obstacles, t_ocl ocl);
+float av_velocity_out(const t_param params, float *tot_u, t_ocl ocl);
+float av_velocity_in(const t_param params, float *tot_u, t_ocl ocl);
 
 /* calculate Reynolds number */
 float calc_reynolds(const t_param params, float *cells, float *tot_u, int *obstacles, t_ocl ocl);
@@ -198,12 +198,12 @@ int main(int argc, char *argv[])
 
   for (int tt = 0; tt < params.maxIters; tt+=2)
   {
-    accelerate_flow_out(params, cells, obstacles, ocl);
-    collision_out(params, cells, tmp_cells, obstacles, ocl);
-    av_vels[tt] = av_velocity_out(params, cells, tot_u, obstacles, ocl);
-    accelerate_flow_in(params, cells, obstacles, ocl);
-    collision_in(params, cells, tmp_cells, obstacles, ocl);
-    av_vels[tt+1] = av_velocity_in(params, cells, tot_u, obstacles, ocl);
+    accelerate_flow_out(params, ocl);
+    collision_out(params, ocl);
+    av_vels[tt] = av_velocity_out(params, tot_u, ocl);
+    accelerate_flow_in(params, ocl);
+    collision_in(params, ocl);
+    av_vels[tt+1] = av_velocity_in(params, tot_u, ocl);
 
 #ifdef DEBUG
     printf("==timestep: %d==\n", tt);
@@ -232,7 +232,7 @@ int main(int argc, char *argv[])
   return EXIT_SUCCESS;
 }
 
-int accelerate_flow_out(const t_param params, float *cells, int *obstacles, t_ocl ocl)
+int accelerate_flow_out(const t_param params, t_ocl ocl)
 {
   cl_int err;
 
@@ -259,7 +259,7 @@ int accelerate_flow_out(const t_param params, float *cells, int *obstacles, t_oc
   return EXIT_SUCCESS;
 }
 
-int accelerate_flow_in(const t_param params, float *cells, int *obstacles, t_ocl ocl)
+int accelerate_flow_in(const t_param params, t_ocl ocl)
 {
   cl_int err;
 
@@ -286,7 +286,7 @@ int accelerate_flow_in(const t_param params, float *cells, int *obstacles, t_ocl
   return EXIT_SUCCESS;
 }
 
-int collision_out(const t_param params, float *cells, float *tmp_cells, int *obstacles, t_ocl ocl)
+int collision_out(const t_param params, t_ocl ocl)
 {
   cl_int err;
 
@@ -313,7 +313,7 @@ int collision_out(const t_param params, float *cells, float *tmp_cells, int *obs
   return EXIT_SUCCESS;
 }
 
-int collision_in(const t_param params, float *cells, float *tmp_cells, int *obstacles, t_ocl ocl)
+int collision_in(const t_param params, t_ocl ocl)
 {
   cl_int err;
 
@@ -340,7 +340,7 @@ int collision_in(const t_param params, float *cells, float *tmp_cells, int *obst
   return EXIT_SUCCESS;
 }
 
-float av_velocity_out(const t_param params, float *cells, float *tot_u, int *obstacles, t_ocl ocl)
+float av_velocity_out(const t_param params, float *tot_u, t_ocl ocl)
 {
   cl_int err;
 
@@ -377,7 +377,7 @@ float av_velocity_out(const t_param params, float *cells, float *tot_u, int *obs
   return tot / (float)params.tot_cells;
 }
 
-float av_velocity_in(const t_param params, float *cells, float *tot_u, int *obstacles, t_ocl ocl)
+float av_velocity_in(const t_param params, float *tot_u, t_ocl ocl)
 {
   cl_int err;
 
@@ -691,7 +691,7 @@ float calc_reynolds(const t_param params, float *cells, float *tot_u, int *obsta
 {
   const float viscosity = 1.f / 6.f * (2.f / params.omega - 1.f);
 
-  return av_velocity_out(params, cells, tot_u, obstacles, ocl) * params.reynolds_dim / viscosity;
+  return av_velocity_out(params, tot_u, ocl) * params.reynolds_dim / viscosity;
 }
 
 float total_density(const t_param params, float *cells)
