@@ -150,14 +150,21 @@ kernel void av_velocity(global float* cells, global float* tot_u, global int* ob
   
   loc_u[local_ii + (local_nx * local_jj)] = sqrt((u_x * u_x) + (u_y * u_y)) * condition;
 
-  barrier(CLK_LOCAL_MEM_FENCE);
+  // Loop for computing localSums : divide WorkGroup into 2 parts
+  for (uint stride = (local_nx * local_ny)/2; stride > 0; stride /=2)
+  {
+      // Waiting for each 2x2 addition into given workgroup
+      barrier(CLK_LOCAL_MEM_FENCE);
 
-  float group_sum = 0.f;
-
-  if (local_ii == 1 && local_jj == 1){
-    for (int i = 0; i < local_nx * local_ny; i++) {
-        group_sum += loc_u[i];             
-    }
-    tot_u[group_ii + (int)(nx / local_nx) * group_jj] = group_sum;                                       
+      // Add elements 2 by 2 between local_id and local_id + stride
+      if (local_ii + (local_nx * local_jj) < stride){
+        loc_u[local_ii + (local_nx * local_jj)] +=  loc_u[local_ii + stride + (local_nx * (local_jj))];
+      }
   }
+
+  // Write result into partialSums[nWorkGroups]
+  if (local_ii + (local_nx * local_jj) == 0){
+    tot_u[group_ii + ((nx / local_nx) * group_jj)] = loc_u[0]; 
+  }
+
 }
