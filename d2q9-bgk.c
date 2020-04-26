@@ -99,12 +99,14 @@ typedef struct
   cl_kernel accelerate_flow;
   cl_kernel collision;
   cl_kernel av_velocity;
+  cl_kernel sumGPU;
 
   cl_mem cells;
   cl_mem tmp_cells;
   cl_mem obstacles;
-  cl_mem tot_u;
-  cl_mem av_vels;
+  cl_mem tot_u; //group partial sums
+  cl_mem av_vels; //final av_vels
+  cl_mem par_sums;
 } t_ocl;
 
 
@@ -126,6 +128,7 @@ int accelerate_flow_out(const t_param params, t_ocl ocl);
 int accelerate_flow_in(const t_param params, t_ocl ocl);
 int collision_out(const t_param params, t_ocl ocl);
 int collision_in(const t_param params, t_ocl ocl);
+int sumGPU(const t_param params, t_ocl ocl, int tt);
 int write_values(const t_param params, float *cells, int *obstacles, float *av_vels);
 
 /* finalise, including freeing up allocated memory */
@@ -204,10 +207,12 @@ int main(int argc, char *argv[])
     accelerate_flow_out(params, ocl);
     collision_out(params, ocl);
     av_velocity_out(params, tot_u, ocl, tt);
-    
+    sumGPU(params, ocl, tt);
+
     accelerate_flow_in(params, ocl);
     collision_in(params, ocl);
     av_velocity_in(params, tot_u, ocl, tt+1);
+    sumGPU(params, ocl, tt+1);
 
 #ifdef DEBUG
     printf("==timestep: %d==\n", tt);
@@ -409,6 +414,35 @@ int av_velocity_in(const t_param params, float *tot_u, t_ocl ocl, int tt)
   size_t local[2] = {LOC_SIZE_X, LOC_SIZE_Y};
   err = clEnqueueNDRangeKernel(ocl.queue, ocl.av_velocity, 2, NULL, global, local, 0, NULL, NULL);
   checkError(err, "enqueueing av_velocity kernel", __LINE__);
+
+  return EXIT_SUCCESS;
+}
+
+int sumGPU(const t_param params, t_ocl ocl, int tt)
+{
+  cl_int err;
+
+  // Set kernel arguments
+  err = clSetKernelArg(ocl.sumGPU, 0, sizeof(cl_mem), &ocl.tot_u);
+  checkError(err, "setting sumGPU arg 0", __LINE__);
+  err = clSetKernelArg(ocl.sumGPU, 1, sizeof(cl_mem), &ocl.par_sums);
+  checkError(err, "setting sumGPU arg 1", __LINE__);
+  err = clSetKernelArg(ocl.sumGPU, 2, sizeof(cl_float) * (params.group_count), NULL);
+  checkError(err, "setting sumGPU arg 2", __LINE__);
+  err = clSetKernelArg(ocl.sumGPU, 3, sizeof(cl_mem), &ocl.av_vels);
+  checkError(err, "setting sumGPU arg 3", __LINE__);
+  err = clSetKernelArg(ocl.sumGPU, 4, sizeof(cl_int), &params.nx);
+  checkError(err, "setting sumGPU arg 4", __LINE__);
+  err = clSetKernelArg(ocl.sumGPU, 5, sizeof(cl_int), &params.ny);
+  checkError(err, "setting sumGPU arg 5", __LINE__);
+  err = clSetKernelArg(ocl.sumGPU, 6, sizeof(cl_int), &tt);
+  checkError(err, "setting sumGPU arg 6", __LINE__);
+
+  // Enqueue kernel
+  size_t global[2] = {params.nx / LOC_SIZE_X, params.ny / LOC_SIZE_Y};
+  size_t local[2] = {2,16};
+  err = clEnqueueNDRangeKernel(ocl.queue, ocl.sumGPU, 2, NULL, global, local, 0, NULL, NULL);
+  checkError(err, "enqueueing sumGPU kernel", __LINE__);
 
   return EXIT_SUCCESS;
 }
@@ -635,6 +669,8 @@ int initialise(const char *paramfile, const char *obstaclefile, t_param *params,
   checkError(err, "creating collision kernel", __LINE__);
   ocl->av_velocity = clCreateKernel(ocl->program, "av_velocity", &err);
   checkError(err, "creating av_velocity kernel", __LINE__);
+  ocl->sumGPU = clCreateKernel(ocl->program, "sumGPU", &err);
+  checkError(err, "creating sumGPU kernel", __LINE__);
 
   // Allocate OpenCL buffers
   ocl->cells = clCreateBuffer(ocl->context, CL_MEM_READ_WRITE, sizeof(cl_float) * params->nx * params->ny * NSPEEDS, NULL, &err);
@@ -647,6 +683,8 @@ int initialise(const char *paramfile, const char *obstaclefile, t_param *params,
   checkError(err, "creating tot_u buffer", __LINE__);
   ocl->av_vels = clCreateBuffer(ocl->context, CL_MEM_READ_WRITE, sizeof(cl_float) * params->maxIters, NULL, &err);
   checkError(err, "creating av_vels buffer", __LINE__);
+  ocl->par_sums = clCreateBuffer(ocl->context, CL_MEM_READ_WRITE, sizeof(cl_float) * params->group_count, NULL, &err);
+  checkError(err, "creating par_sums buffer", __LINE__);
 
   return EXIT_SUCCESS;
 }
@@ -676,10 +714,12 @@ int finalise(const t_param *params, float **cells_ptr, float **tmp_cells_ptr, in
   clReleaseMemObject(ocl.obstacles);
   clReleaseMemObject(ocl.tot_u);
   clReleaseMemObject(ocl.av_vels);
+  clReleaseMemObject(ocl.par_sums);
 
   clReleaseKernel(ocl.accelerate_flow);
   clReleaseKernel(ocl.collision);
   clReleaseKernel(ocl.av_velocity);
+  clReleaseKernel(ocl.sumGPU);
 
   clReleaseProgram(ocl.program);
   clReleaseCommandQueue(ocl.queue);

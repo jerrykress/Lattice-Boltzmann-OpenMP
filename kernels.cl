@@ -164,19 +164,48 @@ kernel void av_velocity(global float* cells, global float* tot_u, global int* ob
 
   // Write result into partialSums[nWorkGroups]
   if (local_ii + (local_nx * local_jj) == 0){
-    tot_u[group_ii + ((nx / local_nx) * group_jj)] = loc_u[0]; 
+    tot_u[group_ii + ((nx / local_nx) * group_jj)] = loc_u[0] / tot_cells; 
   }
-
-  float av_vel = 0.f;
-  
-  for(int i = 0; i < (nx / local_nx) * (ny / local_ny); i++){
-    av_vel += tot_u[i];
-  }
-
-  if (group_ii == 0 && group_jj == 0){
-    av_vels[tt] = av_vel / tot_cells;
-  }
-
-  
-
 }
+
+kernel void sumGPU (global float* input, global float *partialSums, local float *localSums, global float* av_vels, int nx, int ny, int tt)
+{
+  int ii = get_global_id(0);
+  int jj = get_global_id(1);
+  int local_ii = get_local_id(0);
+  int local_jj = get_local_id(1);
+  int local_nx = get_local_size(0);
+  int local_ny = get_local_size(1);
+  nx = get_global_size(0);
+  ny = get_global_size(1);
+  int group_ii = get_group_id(0);
+  int group_jj = get_group_id(1);
+
+  localSums[local_ii + (local_nx * local_jj)] = input[ii + nx * jj];
+
+// Loop for computing localSums : divide WorkGroup into 2 parts
+  for (uint stride = (local_nx * local_ny)/2; stride > 0; stride /=2)
+  {
+      // Waiting for each 2x2 addition into given workgroup
+      barrier(CLK_LOCAL_MEM_FENCE);
+
+      // Add elements 2 by 2 between local_id and local_id + stride
+      if (local_ii + (local_nx * local_jj) < stride){
+        localSums[local_ii + (local_nx * local_jj)] +=  localSums[local_ii + stride + (local_nx * (local_jj))];
+      }
+  }
+
+  // Write result into partialSums[nWorkGroups]
+  if (local_ii + (local_nx * local_jj) == 0){
+    partialSums[group_ii + ((nx / local_nx) * group_jj)] = localSums[0]; 
+  }
+
+  float sum = 0;
+
+  for (int i = 0; i < (nx / local_nx) * (ny / local_ny); i++){
+    sum += partialSums[i];
+  }
+
+  av_vels[tt] = sum;
+
+}            
