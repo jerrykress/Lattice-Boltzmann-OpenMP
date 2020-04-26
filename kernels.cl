@@ -27,20 +27,19 @@ kernel void accelerate_flow(global float* cells,
 
   /* if the cell is not occupied and
   ** we don't send a negative density */
-  if (!obstacles[ii + jj* nx]
-      && (cells[(3 * nx * ny) + ii + jj* nx] - w1) > 0.f
-      && (cells[(6 * nx * ny) + ii + jj* nx] - w2) > 0.f
-      && (cells[(7 * nx * ny) + ii + jj* nx] - w2) > 0.f)
-  {
-    /* increase 'east-side' densities */
-    cells[(1 * nx *ny) + ii + jj* nx] += w1;
-    cells[(5 * nx *ny) + ii + jj* nx] += w2;
-    cells[(8 * nx *ny) + ii + jj* nx] += w2;
-    /* decrease 'west-side' densities */
-    cells[(3 * nx * ny) + ii + jj* nx] -= w1;
-    cells[(6 * nx * ny) + ii + jj* nx] -= w2;
-    cells[(7 * nx * ny) + ii + jj* nx] -= w2;
-  }
+  int condition = (!obstacles[ii + jj* nx] && (cells[(3 * nx * ny) + ii + jj* nx] - w1) > 0.f
+                              && (cells[(6 * nx * ny) + ii + jj* nx] - w2) > 0.f
+                              && (cells[(7 * nx * ny) + ii + jj* nx] - w2) > 0.f);
+  
+  /* increase 'east-side' densities */
+  cells[(1 * nx *ny) + ii + jj* nx] += (w1 * (condition));
+  cells[(5 * nx *ny) + ii + jj* nx] += (w2 * (condition));
+  cells[(8 * nx *ny) + ii + jj* nx] += (w2 * (condition));
+  /* decrease 'west-side' densities */
+  cells[(3 * nx * ny) + ii + jj* nx] -= (w1 * (condition));
+  cells[(6 * nx * ny) + ii + jj* nx] -= (w2 * (condition));
+  cells[(7 * nx * ny) + ii + jj* nx] -= (w2 * (condition));
+  
 }
 
 kernel void collision(global float* cells, global float* tmp_cells, global int* obstacles,int nx, int ny, float omega) {
@@ -128,31 +127,28 @@ kernel void av_velocity(global float* cells, global float* tot_u, global int* ob
   int group_ii = get_group_id(0);
   int group_jj = get_group_id(1);
 
-  loc_u[local_ii + (local_nx * local_jj)] = 0.f;
+  int condition = (!obstacles[ii + jj*nx]);
+  float local_density = 0.f;
 
-  if (!obstacles[ii + jj*nx]) {
-    float local_density = 0.f;
-
-    for (int kk = 0; kk < NSPEEDS; kk++) {
-      local_density += cells[(kk * nx * ny) + ii + jj*nx];
-    }
-
-    float u_x = (cells[(1 * nx * ny) + ii + jj*nx]
-               + cells[(5 * nx * ny) + ii + jj*nx]
-               + cells[(8 * nx * ny) + ii + jj*nx] 
-              - (cells[(3 * nx * ny) + ii + jj*nx] 
-               + cells[(6 * nx * ny) + ii + jj*nx] 
-               + cells[(7 * nx * ny) + ii + jj*nx])) / local_density;
-
-    float u_y = (cells[(2 * nx * ny) + ii + jj*nx] 
-               + cells[(5 * nx * ny) + ii + jj*nx] 
-               + cells[(6 * nx * ny) + ii + jj*nx] 
-              - (cells[(4 * nx * ny) + ii + jj*nx] 
-               + cells[(7 * nx * ny) + ii + jj*nx] 
-               + cells[(8 * nx * ny) + ii + jj*nx])) / local_density;
-    
-    loc_u[local_ii + (local_nx * local_jj)] = sqrt((u_x * u_x) + (u_y * u_y));
+  for (int kk = 0; kk < NSPEEDS; kk++) {
+    local_density += cells[(kk * nx * ny) + ii + jj*nx];
   }
+
+  float u_x = (cells[(1 * nx * ny) + ii + jj*nx]
+              + cells[(5 * nx * ny) + ii + jj*nx]
+              + cells[(8 * nx * ny) + ii + jj*nx] 
+            - (cells[(3 * nx * ny) + ii + jj*nx] 
+              + cells[(6 * nx * ny) + ii + jj*nx] 
+              + cells[(7 * nx * ny) + ii + jj*nx])) / local_density;
+
+  float u_y = (cells[(2 * nx * ny) + ii + jj*nx] 
+              + cells[(5 * nx * ny) + ii + jj*nx] 
+              + cells[(6 * nx * ny) + ii + jj*nx] 
+            - (cells[(4 * nx * ny) + ii + jj*nx] 
+              + cells[(7 * nx * ny) + ii + jj*nx] 
+              + cells[(8 * nx * ny) + ii + jj*nx])) / local_density;
+  
+  loc_u[local_ii + (local_nx * local_jj)] = sqrt((u_x * u_x) + (u_y * u_y)) * condition;
 
   barrier(CLK_LOCAL_MEM_FENCE);
 
