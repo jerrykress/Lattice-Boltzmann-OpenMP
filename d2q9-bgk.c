@@ -68,8 +68,10 @@
 #define AVVELSFILE "av_vels.dat"
 #define OCLFILE "kernels.cl"
 
-#define LOC_SIZE_X 32
+#define LOC_SIZE_X 64
 #define LOC_SIZE_Y 4
+
+// #define DEBUG
 
 /* struct to hold the parameter values */
 typedef struct
@@ -102,6 +104,7 @@ typedef struct
   cl_mem tmp_cells;
   cl_mem obstacles;
   cl_mem tot_u;
+  cl_mem av_vels;
 } t_ocl;
 
 
@@ -134,8 +137,8 @@ int finalise(const t_param *params, float **cells_ptr, float **tmp_cells_ptr,
 float total_density(const t_param params, float *cells);
 
 /* compute average velocity */
-float av_velocity_out(const t_param params, float *tot_u, t_ocl ocl);
-float av_velocity_in(const t_param params, float *tot_u, t_ocl ocl);
+int av_velocity_out(const t_param params, float *tot_u, t_ocl ocl, int tt);
+int av_velocity_in(const t_param params, float *tot_u, t_ocl ocl, int tt);
 
 /* calculate Reynolds number */
 float calc_reynolds(const t_param params, float *cells, float *tot_u, int *obstacles, t_ocl ocl);
@@ -200,10 +203,11 @@ int main(int argc, char *argv[])
   {
     accelerate_flow_out(params, ocl);
     collision_out(params, ocl);
-    av_vels[tt] = av_velocity_out(params, tot_u, ocl);
+    av_velocity_out(params, tot_u, ocl, tt);
+    
     accelerate_flow_in(params, ocl);
     collision_in(params, ocl);
-    av_vels[tt+1] = av_velocity_in(params, tot_u, ocl);
+    av_velocity_in(params, tot_u, ocl, tt+1);
 
 #ifdef DEBUG
     printf("==timestep: %d==\n", tt);
@@ -211,6 +215,9 @@ int main(int argc, char *argv[])
     printf("tot density: %.12E\n", total_density(params, cells));
 #endif
   }
+
+  err = clEnqueueReadBuffer(ocl.queue, ocl.av_vels, CL_TRUE, 0, sizeof(cl_float) * params.maxIters, av_vels, 0, NULL, NULL);
+  checkError(err, "reading final av_vels data", __LINE__);
 
   gettimeofday(&timstr, NULL);
   toc = timstr.tv_sec + (timstr.tv_usec / 1000000.0);
@@ -340,7 +347,7 @@ int collision_in(const t_param params, t_ocl ocl)
   return EXIT_SUCCESS;
 }
 
-float av_velocity_out(const t_param params, float *tot_u, t_ocl ocl)
+int av_velocity_out(const t_param params, float *tot_u, t_ocl ocl, int tt)
 {
   cl_int err;
 
@@ -351,12 +358,18 @@ float av_velocity_out(const t_param params, float *tot_u, t_ocl ocl)
   checkError(err, "setting av_velocity arg 1", __LINE__);
   err = clSetKernelArg(ocl.av_velocity, 2, sizeof(cl_mem), &ocl.obstacles);
   checkError(err, "setting av_velocity arg 2", __LINE__);
-  err = clSetKernelArg(ocl.av_velocity, 3, sizeof(cl_float) * params.group_size, NULL);
+  err = clSetKernelArg(ocl.av_velocity, 3, sizeof(cl_mem), &ocl.av_vels);
   checkError(err, "setting av_velocity arg 3", __LINE__);
-  err = clSetKernelArg(ocl.av_velocity, 4, sizeof(cl_int), &params.nx);
+  err = clSetKernelArg(ocl.av_velocity, 4, sizeof(cl_float) * params.group_size, NULL);
   checkError(err, "setting av_velocity arg 4", __LINE__);
-  err = clSetKernelArg(ocl.av_velocity, 5, sizeof(cl_int), &params.ny);
+  err = clSetKernelArg(ocl.av_velocity, 5, sizeof(cl_int), &params.nx);
   checkError(err, "setting av_velocity arg 5", __LINE__);
+  err = clSetKernelArg(ocl.av_velocity, 6, sizeof(cl_int), &params.ny);
+  checkError(err, "setting av_velocity arg 6", __LINE__);
+  err = clSetKernelArg(ocl.av_velocity, 7, sizeof(cl_int), &tt);
+  checkError(err, "setting av_velocity arg 7", __LINE__);
+  err = clSetKernelArg(ocl.av_velocity, 8, sizeof(cl_int), &params.tot_cells);
+  checkError(err, "setting av_velocity arg 8", __LINE__);
 
   // Enqueue kernel
   size_t global[2] = {params.nx, params.ny};
@@ -364,20 +377,10 @@ float av_velocity_out(const t_param params, float *tot_u, t_ocl ocl)
   err = clEnqueueNDRangeKernel(ocl.queue, ocl.av_velocity, 2, NULL, global, local, 0, NULL, NULL);
   checkError(err, "enqueueing av_velocity kernel", __LINE__);
 
-  // Read cells from device
-  err = clEnqueueReadBuffer(ocl.queue, ocl.tot_u, CL_TRUE, 0, sizeof(float) * params.group_count, tot_u, 0, NULL, NULL);
-  checkError(err, "reading tot_u data", __LINE__);
-
-  float tot = 0;
-
-  for (int i = 0; i < params.group_count; i++){
-    tot += tot_u[i];
-  }
-
-  return tot / (float)params.tot_cells;
+  return EXIT_SUCCESS;
 }
 
-float av_velocity_in(const t_param params, float *tot_u, t_ocl ocl)
+int av_velocity_in(const t_param params, float *tot_u, t_ocl ocl, int tt)
 {
   cl_int err;
 
@@ -388,12 +391,18 @@ float av_velocity_in(const t_param params, float *tot_u, t_ocl ocl)
   checkError(err, "setting av_velocity arg 1", __LINE__);
   err = clSetKernelArg(ocl.av_velocity, 2, sizeof(cl_mem), &ocl.obstacles);
   checkError(err, "setting av_velocity arg 2", __LINE__);
-  err = clSetKernelArg(ocl.av_velocity, 3, sizeof(cl_float) * params.group_size, NULL);
+  err = clSetKernelArg(ocl.av_velocity, 3, sizeof(cl_mem), &ocl.av_vels);
   checkError(err, "setting av_velocity arg 3", __LINE__);
-  err = clSetKernelArg(ocl.av_velocity, 4, sizeof(cl_int), &params.nx);
+  err = clSetKernelArg(ocl.av_velocity, 4, sizeof(cl_float) * params.group_size, NULL);
   checkError(err, "setting av_velocity arg 4", __LINE__);
-  err = clSetKernelArg(ocl.av_velocity, 5, sizeof(cl_int), &params.ny);
+  err = clSetKernelArg(ocl.av_velocity, 5, sizeof(cl_int), &params.nx);
   checkError(err, "setting av_velocity arg 5", __LINE__);
+  err = clSetKernelArg(ocl.av_velocity, 6, sizeof(cl_int), &params.ny);
+  checkError(err, "setting av_velocity arg 6", __LINE__);
+  err = clSetKernelArg(ocl.av_velocity, 7, sizeof(cl_int), &tt);
+  checkError(err, "setting av_velocity arg 7", __LINE__);
+  err = clSetKernelArg(ocl.av_velocity, 8, sizeof(cl_int), &params.tot_cells);
+  checkError(err, "setting av_velocity arg 8", __LINE__);
 
   // Enqueue kernel
   size_t global[2] = {params.nx, params.ny};
@@ -401,18 +410,7 @@ float av_velocity_in(const t_param params, float *tot_u, t_ocl ocl)
   err = clEnqueueNDRangeKernel(ocl.queue, ocl.av_velocity, 2, NULL, global, local, 0, NULL, NULL);
   checkError(err, "enqueueing av_velocity kernel", __LINE__);
 
-  // Read cells from device
-  err = clEnqueueReadBuffer(ocl.queue, ocl.tot_u, CL_TRUE, 0, sizeof(float) * params.group_count, tot_u, 0, NULL, NULL);
-  checkError(err, "reading tot_u data", __LINE__);
-
-  float tot = 0;
-
-  for (int i = 0; i < params.group_count; i++)
-  {
-    tot += tot_u[i];
-  }
-
-  return tot / (float)params.tot_cells;
+  return EXIT_SUCCESS;
 }
 
 int initialise(const char *paramfile, const char *obstaclefile, t_param *params, float **cells_ptr, float **tmp_cells_ptr, int **obstacles_ptr, float **tot_u, float **av_vels_ptr, t_ocl *ocl)
@@ -647,6 +645,8 @@ int initialise(const char *paramfile, const char *obstaclefile, t_param *params,
   checkError(err, "creating obstacles buffer", __LINE__);
   ocl->tot_u = clCreateBuffer(ocl->context, CL_MEM_READ_WRITE, sizeof(cl_float) * params->group_count, NULL, &err);
   checkError(err, "creating tot_u buffer", __LINE__);
+  ocl->av_vels = clCreateBuffer(ocl->context, CL_MEM_READ_WRITE, sizeof(cl_float) * params->maxIters, NULL, &err);
+  checkError(err, "creating av_vels buffer", __LINE__);
 
   return EXIT_SUCCESS;
 }
@@ -675,6 +675,7 @@ int finalise(const t_param *params, float **cells_ptr, float **tmp_cells_ptr, in
   clReleaseMemObject(ocl.tmp_cells);
   clReleaseMemObject(ocl.obstacles);
   clReleaseMemObject(ocl.tot_u);
+  clReleaseMemObject(ocl.av_vels);
 
   clReleaseKernel(ocl.accelerate_flow);
   clReleaseKernel(ocl.collision);
@@ -691,7 +692,8 @@ float calc_reynolds(const t_param params, float *cells, float *tot_u, int *obsta
 {
   const float viscosity = 1.f / 6.f * (2.f / params.omega - 1.f);
 
-  return av_velocity_out(params, tot_u, ocl) * params.reynolds_dim / viscosity;
+  // return av_velocity_out(params, tot_u, ocl) * params.reynolds_dim / viscosity;
+  return 0;
 }
 
 float total_density(const t_param params, float *cells)

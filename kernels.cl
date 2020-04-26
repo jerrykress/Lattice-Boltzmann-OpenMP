@@ -116,7 +116,7 @@ kernel void collision(global float* cells, global float* tmp_cells, global int* 
 }
 
 
-kernel void av_velocity(global float* cells, global float* tot_u, global int* obstacles, local float* loc_u, int nx, int ny) {
+kernel void av_velocity(global float* cells, global float* tot_u, global int* obstacles, global float* av_vels, local float* loc_u, int nx, int ny, int tt, int tot_cells) {
   /* loop over the cells in the grid */
   int ii = get_global_id(0);
   int jj = get_global_id(1);
@@ -166,5 +166,17 @@ kernel void av_velocity(global float* cells, global float* tot_u, global int* ob
   if (local_ii + (local_nx * local_jj) == 0){
     tot_u[group_ii + ((nx / local_nx) * group_jj)] = loc_u[0]; 
   }
+
+  float av_vel = 0.f;
+  
+  for(int i = 0; i < (nx / local_nx) * (ny / local_ny); i++){
+    av_vel += tot_u[i];
+  }
+
+  if (group_ii == 0 && group_jj == 0){
+    av_vels[tt] = av_vel / tot_cells;
+  }
+
+  
 
 }
